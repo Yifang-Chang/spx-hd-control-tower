@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPX HD Network Control Tower</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root{
+  --bg:#070b14; --panel:#0d1422; --panel2:#111b2e; --line:#1c2942;
+  --txt:#cdd9ee; --muted:#6f82a3; --accent:#1cc8ff; --accent2:#7af0c0;
+  --green:#27d97f; --yellow:#ffc83d; --red:#ff4d62; --grey:#33425f;
+  --glow:0 0 18px rgba(28,200,255,.25);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(900px 500px at 80% -10%, rgba(28,200,255,.07), transparent),
+    radial-gradient(700px 500px at 0% 110%, rgba(122,240,192,.05), transparent),
+    var(--bg);
+  color:var(--txt);font-family:"Segoe UI",Roboto,"Noto Sans TC",system-ui,sans-serif;
+  font-size:13px;overflow:hidden;
+}
+.app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
+header{display:flex;align-items:center;gap:18px;padding:10px 18px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#0c1626,#0a1120)}
+.brand{display:flex;align-items:center;gap:12px;min-width:320px}
+.logo{width:34px;height:34px;border-radius:8px;background:conic-gradient(from 0deg,#1cc8ff,#7af0c0,#1cc8ff);
+  display:grid;place-items:center;font-weight:800;color:#04121d;box-shadow:var(--glow)}
+.brand h1{font-size:15px;letter-spacing:.5px}
+.brand .sub{font-size:10.5px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.kpibar{display:flex;gap:8px;flex:1;flex-wrap:wrap;justify-content:center}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 11px;min-width:96px}
+.kpi .lbl{font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
+.kpi .val{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+.kpi .val small{font-size:10px;font-weight:600;color:var(--muted)}
+.clock{text-align:right;min-width:150px;font-variant-numeric:tabular-nums}
+.clock .t{font-size:17px;font-weight:700;color:var(--accent)}
+.clock .d{font-size:10px;color:var(--muted);letter-spacing:1px}
+.live{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--green)}
+.live .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+main{display:grid;grid-template-columns:248px 1fr 348px;gap:12px;padding:12px;overflow:hidden}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.panel h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);
+  padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.panel .body{padding:11px 12px;overflow:auto}
+.layerbtn{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;cursor:pointer;
+  background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:7px;color:var(--txt);transition:.15s}
+.layerbtn:hover{border-color:var(--accent);transform:translateX(2px)}
+.layerbtn.active{border-color:var(--accent);background:linear-gradient(90deg,rgba(28,200,255,.16),transparent);box-shadow:var(--glow)}
+.layerbtn .ttl{font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px}
+.layerbtn .ds{font-size:9.5px;color:var(--muted)}
+.layerbtn .ic{width:16px;text-align:center}
+.section-label{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin:6px 0 8px}
+select{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px}
+.legend{margin-top:12px}
+.legend .row{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:11px}
+.legend .sw{width:16px;height:11px;border-radius:3px;flex:none}
+.btn{display:block;width:100%;text-align:center;cursor:pointer;background:linear-gradient(90deg,#1cc8ff,#7af0c0);
+  color:#04121d;font-weight:700;border:none;border-radius:8px;padding:9px;margin-top:8px;font-size:12px}
+.btn.ghost{background:var(--panel2);color:var(--accent);border:1px solid var(--line)}
+.filehint{font-size:9.5px;color:var(--muted);margin-top:6px;line-height:1.5}
+.mapwrap{position:relative;flex:1;min-height:0}
+#map{width:100%;height:100%}
+#map path{stroke:#0a1322;stroke-width:.4px;cursor:pointer;transition:fill .25s,stroke .12s}
+#map path:hover{stroke:#fff;stroke-width:1.1px}
+#map path.sel{stroke:var(--accent);stroke-width:1.6px}
+.maptitle{position:absolute;top:10px;left:14px;font-size:13px;font-weight:700;text-shadow:0 1px 4px #000}
+.maptitle span{color:var(--muted);font-weight:500;font-size:11px}
+.maphint{position:absolute;bottom:10px;left:14px;font-size:10px;color:var(--muted)}
+.loading{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:12px}
+.spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.tooltip{position:fixed;pointer-events:none;z-index:50;background:rgba(8,14,26,.96);border:1px solid var(--accent);
+  border-radius:9px;padding:9px 11px;font-size:11.5px;min-width:200px;box-shadow:0 8px 30px rgba(0,0,0,.6);opacity:0;transition:opacity .1s}
+.tooltip h4{font-size:12.5px;margin-bottom:6px;color:#fff;display:flex;justify-content:space-between;gap:10px;align-items:center}
+.tooltip .r{display:flex;justify-content:space-between;gap:14px;margin:2px 0;color:var(--muted)}
+.tooltip .r b{color:var(--txt);font-variant-numeric:tabular-nums}
+.pill{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:20px;color:#04121d}
+.scorebig{display:flex;align-items:center;gap:14px;padding:4px 2px 12px}
+.scorering{width:84px;height:84px;flex:none}
+.scoremeta .nm{font-size:16px;font-weight:800}
+.scoremeta .cty{font-size:11px;color:var(--muted)}
+.scoremeta .badge{display:inline-block;margin-top:6px;font-size:11px;font-weight:800;padding:3px 11px;border-radius:20px;color:#04121d}
+.metric{margin:10px 0}
+.metric .top{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px}
+.metric .q{color:var(--muted)}
+.metric .v{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums}
+.bar{height:8px;border-radius:6px;background:var(--panel2);margin-top:5px;overflow:hidden;position:relative}
+.bar > i{display:block;height:100%;border-radius:6px}
+.bar .tgt{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.75}
+.ans{font-size:10px;color:var(--muted);margin-top:3px}
+.empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:12px;line-height:1.6}
+.watch .wrow{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+.watch .wrow:hover{background:var(--panel2);border-color:var(--line)}
+.watch .wlight{width:9px;height:9px;border-radius:50%;flex:none}
+.watch .wnm{flex:1;font-size:12px}
+.watch .wnm small{color:var(--muted);font-size:10px}
+.watch .wsc{font-weight:800;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{flex:1;text-align:center;font-size:11px;padding:6px;border-radius:7px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
+.tab.active{color:var(--accent);border-color:var(--accent)}
+footer{border-top:1px solid var(--line);background:#0a1120;padding:9px 14px;display:flex;gap:9px;overflow-x:auto}
+.qcard{flex:1;min-width:158px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
+.qcard .qh{font-size:9.5px;color:var(--muted);letter-spacing:.3px}
+.qcard .qv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.qcard .qf{font-size:9px;color:var(--muted);font-family:ui-monospace,monospace}
+.qcard .qa{font-size:10px;margin-top:2px}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#1d2c46;border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo">SPX</div>
+      <div><h1>SPX HD NETWORK CONTROL TOWER</h1>
+        <div class="sub">Network Operations Center · Taiwan</div></div>
+    </div>
+    <div class="kpibar" id="kpibar"></div>
+    <div class="clock">
+      <div class="t" id="clock">--:--:--</div>
+      <div class="d" id="date">--</div>
+      <div class="live"><span class="dot"></span> LIVE · <span id="dataSrc">真實資料 June'26</span></div>
+    </div>
+  </header>
+  <main>
+    <section class="panel">
+      <h2>◧ Map Layers</h2>
+      <div class="body">
+        <div id="layers"></div>
+        <div class="section-label">Filter · 縣市</div>
+        <select id="countyFilter"><option value="ALL">全台灣 (All Taiwan)</option></select>
+        <div class="legend" id="legend"></div>
+        <div class="section-label" style="margin-top:14px">Data</div>
+        <button class="btn" onclick="document.getElementById('csv').click()">⬆ 載入我的 CSV 資料</button>
+        <input type="file" id="csv" accept=".csv" style="display:none">
+        <button class="btn ghost" id="tplBtn">⬇ 下載 CSV 模板</button>
+        <button class="btn ghost" id="demoBtn">↺ 還原為上傳的真實資料</button>
+        <div class="filehint">模板欄位：city, district, MP Normal Parcel Target(Q3'26), SCS Target(Q4'26), MP Orders 3PL, MP Orders 4PL, SCS Orders, 3PL Capacity, MP Potential Demand。依 city+district 對應地圖（臺/台 自動轉換）。</div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="mapwrap">
+        <div class="maptitle" id="mapTitle">Area Health Score <span>· 紅黃綠燈總覽</span></div>
+        <svg id="map"></svg>
+        <div class="maphint">滑鼠移入查看 · 點擊鎖定明細 · 灰色＝無資料/未上線 · 下方為全網路解答</div>
+        <div class="loading" id="loading"><div><div class="spinner"></div>載入台灣鄉鎮市區地圖中…<br><small>368 districts · g0v open data</small></div></div>
+      </div>
+    </section>
+    <section class="panel">
+      <h2 id="rightTitle">◉ Area Detail</h2>
+      <div class="body">
+        <div class="tabs">
+          <div class="tab active" data-tab="detail" id="tabDetail">明細</div>
+          <div class="tab" data-tab="watch" id="tabWatch">🔴 觀察清單</div>
+        </div>
+        <div id="detailPane"><div class="empty">點擊地圖上的任一區域<br>查看 6 大 KPI 與健康分數。</div></div>
+        <div id="watchPane" style="display:none" class="watch"></div>
+      </div>
+    </section>
+  </main>
+  <footer id="footer"></footer>
+</div>
+<div class="tooltip" id="tip"></div>
+
+<script>
+/* ============================================================
+   SPX HD NETWORK CONTROL TOWER  ·  6-KPI model
+   ( formulas verified 707/708 vs uploaded Table.xlsx )
+   MP Orders = MP 3PL + MP 4PL ;  Total HD = MP Orders + SCS
+   KPI1 3PL Capacity-to-Demand   = 3PL Capacity / MP Potential Demand
+   KPI2 Potential Demand Coverage = MP 3PL Orders / MP Potential Demand
+   KPI3 4PL Dependency           = MP 4PL / (MP 3PL + MP 4PL)        target <=15%
+   KPI4 SPX HD Service Availability = (MP 3PL + MP 4PL) / MP Potential Demand
+   KPI5 MP Target-to-Demand      = MP 3PL Orders / Normal Parcel Target (Q3'26)
+   KPI6 SCS Target-to-Demand     = SCS Orders / SCS Target (Q4'26)
+   Health = 25*K4 + 20*K2 + 15*K1 + 15*K3inv + 15*K5 + 10*K6
+   Bands: >=90 green  70-89 yellow  <70 red
+   ============================================================ */
+const GEO_URL="https://cdn.jsdelivr.net/gh/g0v/twgeojson@master/json/twTown1982.geo.json";
+const REAL_DATA = [{"city":"基隆市","district":"中正區","mpTargetQ3":103,"scsTargetQ4":58,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"基隆市","district":"中山區","mpTargetQ3":76,"scsTargetQ4":43,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"基隆市","district":"信義區","mpTargetQ3":98,"scsTargetQ4":55,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"基隆市","district":"安樂區","mpTargetQ3":149,"scsTargetQ4":83,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"基隆市","district":"七堵區","mpTargetQ3":98,"scsTargetQ4":55,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"基隆市","district":"仁愛區","mpTargetQ3":71,"scsTargetQ4":39,"mp3":0,"mp4":677,"scs":0,"cap":0,"pot":677},{"city":"基隆市","district":"暖暖區","mpTargetQ3":80,"scsTargetQ4":45,"mp3":0,"mp4":81,"scs":0,"cap":0,"pot":81},{"city":"台北市","district":"松山區","mpTargetQ3":437,"scsTargetQ4":244,"mp3":755,"mp4":0,"scs":118,"cap":708,"pot":801},{"city":"台北市","district":"中正區","mpTargetQ3":411,"scsTargetQ4":229,"mp3":1030,"mp4":9,"scs":154,"cap":615,"pot":1177},{"city":"台北市","district":"內湖區","mpTargetQ3":692,"scsTargetQ4":387,"mp3":770,"mp4":218,"scs":142,"cap":1018,"pot":1101},{"city":"台北市","district":"士林區","mpTargetQ3":533,"scsTargetQ4":298,"mp3":496,"mp4":0,"scs":99,"cap":541,"pot":592},{"city":"台北市","district":"大安區","mpTargetQ3":612,"scsTargetQ4":342,"mp3":838,"mp4":67,"scs":115,"cap":934,"pot":954},{"city":"台北市","district":"文山區","mpTargetQ3":510,"scsTargetQ4":285,"mp3":654,"mp4":441,"scs":107,"cap":721,"pot":1158},{"city":"台北市","district":"中山區","mpTargetQ3":687,"scsTargetQ4":384,"mp3":1556,"mp4":0,"scs":199,"cap":1667,"pot":1672},{"city":"台北市","district":"大同區","mpTargetQ3":321,"scsTargetQ4":179,"mp3":152,"mp4":0,"scs":34,"cap":181,"pot":167},{"city":"台北市","district":"萬華區","mpTargetQ3":347,"scsTargetQ4":194,"mp3":617,"mp4":0,"scs":5,"cap":530,"pot":699},{"city":"台北市","district":"南港區","mpTargetQ3":277,"scsTargetQ4":155,"mp3":262,"mp4":0,"scs":18,"cap":193,"pot":289},{"city":"台北市","district":"信義區","mpTargetQ3":419,"scsTargetQ4":234,"mp3":833,"mp4":145,"scs":123,"cap":987,"pot":1104},{"city":"台北市","district":"北投區","mpTargetQ3":548,"scsTargetQ4":306,"mp3":594,"mp4":0,"scs":115,"cap":758,"pot":651},{"city":"新北市","district":"八里區","mpTargetQ3":175,"scsTargetQ4":98,"mp3":0,"mp4":98,"scs":0,"cap":0,"pot":98},{"city":"新北市","district":"汐止區","mpTargetQ3":988,"scsTargetQ4":552,"mp3":1050,"mp4":0,"scs":177,"cap":1325,"pot":1239},{"city":"新北市","district":"萬里區","mpTargetQ3":23,"scsTargetQ4":13,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新北市","district":"三峽區","mpTargetQ3":244,"scsTargetQ4":136,"mp3":470,"mp4":0,"scs":101,"cap":428,"pot":552},{"city":"新北市","district":"土城區","mpTargetQ3":686,"scsTargetQ4":383,"mp3":829,"mp4":0,"scs":202,"cap":786,"pot":1062},{"city":"新北市","district":"板橋區","mpTargetQ3":1407,"scsTargetQ4":787,"mp3":1152,"mp4":0,"scs":269,"cap":1425,"pot":1853},{"city":"新北市","district":"瑞芳區","mpTargetQ3":61,"scsTargetQ4":34,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新北市","district":"淡水區","mpTargetQ3":957,"scsTargetQ4":535,"mp3":1034,"mp4":207,"scs":154,"cap":1300,"pot":1363},{"city":"新北市","district":"新莊區","mpTargetQ3":1451,"scsTargetQ4":811,"mp3":1795,"mp4":87,"scs":372,"cap":3092,"pot":2007},{"city":"新北市","district":"樹林區","mpTargetQ3":456,"scsTargetQ4":255,"mp3":453,"mp4":47,"scs":100,"cap":555,"pot":553},{"city":"新北市","district":"永和區","mpTargetQ3":439,"scsTargetQ4":245,"mp3":464,"mp4":381,"scs":0,"cap":302,"pot":1081},{"city":"新北市","district":"蘆洲區","mpTargetQ3":550,"scsTargetQ4":307,"mp3":583,"mp4":0,"scs":129,"cap":573,"pot":633},{"city":"新北市","district":"三重區","mpTargetQ3":1201,"scsTargetQ4":671,"mp3":1490,"mp4":0,"scs":358,"cap":1681,"pot":1747},{"city":"新北市","district":"金山區","mpTargetQ3":29,"scsTargetQ4":16,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新北市","district":"三芝區","mpTargetQ3":37,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新北市","district":"深坑區","mpTargetQ3":56,"scsTargetQ4":31,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新北市","district":"新店區","mpTargetQ3":987,"scsTargetQ4":552,"mp3":618,"mp4":0,"scs":119,"cap":472,"pot":784},{"city":"新北市","district":"中和區","mpTargetQ3":1316,"scsTargetQ4":735,"mp3":1236,"mp4":175,"scs":100,"cap":1233,"pot":1780},{"city":"新北市","district":"鶯歌區","mpTargetQ3":183,"scsTargetQ4":102,"mp3":82,"mp4":155,"scs":0,"cap":163,"pot":238},{"city":"新北市","district":"泰山區","mpTargetQ3":170,"scsTargetQ4":95,"mp3":218,"mp4":0,"scs":6,"cap":504,"pot":223},{"city":"新北市","district":"林口區","mpTargetQ3":560,"scsTargetQ4":313,"mp3":754,"mp4":0,"scs":106,"cap":820,"pot":896},{"city":"新北市","district":"五股區","mpTargetQ3":287,"scsTargetQ4":160,"mp3":359,"mp4":0,"scs":56,"cap":565,"pot":378},{"city":"桃園市","district":"蘆竹區","mpTargetQ3":638,"scsTargetQ4":357,"mp3":629,"mp4":191,"scs":100,"cap":1436,"pot":849},{"city":"桃園市","district":"大園區","mpTargetQ3":204,"scsTargetQ4":114,"mp3":229,"mp4":120,"scs":0,"cap":217,"pot":394},{"city":"桃園市","district":"龜山區","mpTargetQ3":767,"scsTargetQ4":428,"mp3":856,"mp4":48,"scs":103,"cap":1062,"pot":1036},{"city":"桃園市","district":"八德區","mpTargetQ3":554,"scsTargetQ4":310,"mp3":639,"mp4":0,"scs":151,"cap":1041,"pot":704},{"city":"桃園市","district":"觀音區","mpTargetQ3":155,"scsTargetQ4":87,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"桃園市","district":"龍潭區","mpTargetQ3":272,"scsTargetQ4":152,"mp3":187,"mp4":137,"scs":22,"cap":418,"pot":325},{"city":"桃園市","district":"楊梅區","mpTargetQ3":472,"scsTargetQ4":264,"mp3":243,"mp4":0,"scs":6,"cap":162,"pot":313},{"city":"桃園市","district":"中壢區","mpTargetQ3":1420,"scsTargetQ4":793,"mp3":1511,"mp4":266,"scs":217,"cap":2387,"pot":1853},{"city":"桃園市","district":"桃園區","mpTargetQ3":1507,"scsTargetQ4":842,"mp3":2168,"mp4":0,"scs":472,"cap":2634,"pot":2476},{"city":"桃園市","district":"平鎮區","mpTargetQ3":540,"scsTargetQ4":302,"mp3":379,"mp4":460,"scs":64,"cap":572,"pot":848},{"city":"桃園市","district":"大溪區","mpTargetQ3":167,"scsTargetQ4":93,"mp3":0,"mp4":156,"scs":0,"cap":0,"pot":156},{"city":"桃園市","district":"新屋區","mpTargetQ3":88,"scsTargetQ4":49,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹市","district":"香山區","mpTargetQ3":174,"scsTargetQ4":97,"mp3":193,"mp4":86,"scs":31,"cap":370,"pot":163},{"city":"新竹市","district":"東區","mpTargetQ3":880,"scsTargetQ4":492,"mp3":657,"mp4":391,"scs":196,"cap":628,"pot":1394},{"city":"新竹市","district":"北區","mpTargetQ3":469,"scsTargetQ4":262,"mp3":426,"mp4":0,"scs":65,"cap":622,"pot":497},{"city":"新竹縣","district":"寶山鄉","mpTargetQ3":50,"scsTargetQ4":28,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹縣","district":"新豐鄉","mpTargetQ3":139,"scsTargetQ4":78,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹縣","district":"關西鎮","mpTargetQ3":39,"scsTargetQ4":22,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹縣","district":"新埔鎮","mpTargetQ3":79,"scsTargetQ4":44,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹縣","district":"芎林鄉","mpTargetQ3":44,"scsTargetQ4":25,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹縣","district":"湖口鄉","mpTargetQ3":201,"scsTargetQ4":112,"mp3":0,"mp4":302,"scs":0,"cap":0,"pot":302},{"city":"新竹縣","district":"北埔鄉","mpTargetQ3":12,"scsTargetQ4":7,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹縣","district":"竹北市","mpTargetQ3":1101,"scsTargetQ4":615,"mp3":1015,"mp4":218,"scs":112,"cap":1002,"pot":1480},{"city":"新竹縣","district":"橫山鄉","mpTargetQ3":20,"scsTargetQ4":11,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"新竹縣","district":"竹東鎮","mpTargetQ3":233,"scsTargetQ4":130,"mp3":0,"mp4":334,"scs":0,"cap":0,"pot":457},{"city":"苗栗縣","district":"竹南鎮","mpTargetQ3":204,"scsTargetQ4":114,"mp3":0,"mp4":341,"scs":0,"cap":0,"pot":341},{"city":"苗栗縣","district":"苑裡鎮","mpTargetQ3":67,"scsTargetQ4":37,"mp3":0,"mp4":63,"scs":0,"cap":0,"pot":63},{"city":"苗栗縣","district":"大湖鄉","mpTargetQ3":19,"scsTargetQ4":11,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"苗栗縣","district":"三義鄉","mpTargetQ3":27,"scsTargetQ4":15,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"苗栗縣","district":"苗栗市","mpTargetQ3":160,"scsTargetQ4":90,"mp3":0,"mp4":151,"scs":0,"cap":0,"pot":151},{"city":"苗栗縣","district":"銅鑼鄉","mpTargetQ3":29,"scsTargetQ4":16,"mp3":0,"mp4":51,"scs":0,"cap":0,"pot":51},{"city":"苗栗縣","district":"後龍鎮","mpTargetQ3":56,"scsTargetQ4":31,"mp3":0,"mp4":51,"scs":0,"cap":0,"pot":51},{"city":"苗栗縣","district":"公館鄉","mpTargetQ3":50,"scsTargetQ4":28,"mp3":0,"mp4":20,"scs":0,"cap":0,"pot":20},{"city":"苗栗縣","district":"卓蘭鎮","mpTargetQ3":16,"scsTargetQ4":9,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"苗栗縣","district":"頭屋鄉","mpTargetQ3":13,"scsTargetQ4":7,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"苗栗縣","district":"頭份市","mpTargetQ3":229,"scsTargetQ4":128,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"苗栗縣","district":"通霄鎮","mpTargetQ3":40,"scsTargetQ4":23,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台中市","district":"西屯區","mpTargetQ3":1168,"scsTargetQ4":653,"mp3":1577,"mp4":0,"scs":318,"cap":2431,"pot":1649},{"city":"台中市","district":"大里區","mpTargetQ3":562,"scsTargetQ4":314,"mp3":420,"mp4":235,"scs":152,"cap":555,"pot":681},{"city":"台中市","district":"外埔區","mpTargetQ3":49,"scsTargetQ4":28,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台中市","district":"神岡區","mpTargetQ3":165,"scsTargetQ4":92,"mp3":85,"mp4":0,"scs":16,"cap":178,"pot":85},{"city":"台中市","district":"大雅區","mpTargetQ3":288,"scsTargetQ4":161,"mp3":0,"mp4":267,"scs":0,"cap":0,"pot":267},{"city":"台中市","district":"西區","mpTargetQ3":472,"scsTargetQ4":264,"mp3":699,"mp4":0,"scs":151,"cap":1183,"pot":724},{"city":"台中市","district":"南區","mpTargetQ3":540,"scsTargetQ4":302,"mp3":535,"mp4":0,"scs":124,"cap":859,"pot":556},{"city":"台中市","district":"東勢區","mpTargetQ3":53,"scsTargetQ4":30,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台中市","district":"豐原區","mpTargetQ3":385,"scsTargetQ4":215,"mp3":312,"mp4":0,"scs":56,"cap":287,"pot":334},{"city":"台中市","district":"南屯區","mpTargetQ3":865,"scsTargetQ4":484,"mp3":952,"mp4":0,"scs":167,"cap":1114,"pot":1014},{"city":"台中市","district":"中區","mpTargetQ3":62,"scsTargetQ4":35,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台中市","district":"烏日區","mpTargetQ3":325,"scsTargetQ4":182,"mp3":295,"mp4":81,"scs":64,"cap":400,"pot":380},{"city":"台中市","district":"清水區","mpTargetQ3":160,"scsTargetQ4":89,"mp3":0,"mp4":102,"scs":0,"cap":0,"pot":102},{"city":"台中市","district":"大肚區","mpTargetQ3":90,"scsTargetQ4":50,"mp3":0,"mp4":158,"scs":0,"cap":0,"pot":158},{"city":"台中市","district":"梧棲區","mpTargetQ3":140,"scsTargetQ4":78,"mp3":192,"mp4":14,"scs":27,"cap":144,"pot":241},{"city":"台中市","district":"太平區","mpTargetQ3":611,"scsTargetQ4":341,"mp3":571,"mp4":0,"scs":133,"cap":456,"pot":629},{"city":"台中市","district":"新社區","mpTargetQ3":29,"scsTargetQ4":16,"mp3":0,"mp4":77,"scs":0,"cap":0,"pot":77},{"city":"台中市","district":"沙鹿區","mpTargetQ3":220,"scsTargetQ4":123,"mp3":99,"mp4":226,"scs":0,"cap":201,"pot":325},{"city":"台中市","district":"潭子區","mpTargetQ3":306,"scsTargetQ4":171,"mp3":243,"mp4":88,"scs":53,"cap":377,"pot":341},{"city":"台中市","district":"龍井區","mpTargetQ3":161,"scsTargetQ4":90,"mp3":100,"mp4":0,"scs":17,"cap":129,"pot":101},{"city":"台中市","district":"北屯區","mpTargetQ3":1295,"scsTargetQ4":724,"mp3":1476,"mp4":0,"scs":224,"cap":1456,"pot":1674},{"city":"台中市","district":"大甲區","mpTargetQ3":127,"scsTargetQ4":71,"mp3":0,"mp4":138,"scs":0,"cap":0,"pot":138},{"city":"台中市","district":"東區","mpTargetQ3":270,"scsTargetQ4":151,"mp3":233,"mp4":72,"scs":48,"cap":228,"pot":326},{"city":"台中市","district":"后里區","mpTargetQ3":82,"scsTargetQ4":46,"mp3":0,"mp4":113,"scs":0,"cap":0,"pot":113},{"city":"台中市","district":"北區","mpTargetQ3":562,"scsTargetQ4":314,"mp3":573,"mp4":0,"scs":141,"cap":634,"pot":639},{"city":"台中市","district":"霧峰區","mpTargetQ3":134,"scsTargetQ4":75,"mp3":0,"mp4":185,"scs":0,"cap":0,"pot":185},{"city":"彰化縣","district":"鹿港鎮","mpTargetQ3":173,"scsTargetQ4":97,"mp3":0,"mp4":85,"scs":0,"cap":0,"pot":85},{"city":"彰化縣","district":"二水鄉","mpTargetQ3":12,"scsTargetQ4":7,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"永靖鄉","mpTargetQ3":38,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"溪州鄉","mpTargetQ3":30,"scsTargetQ4":17,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"田中鎮","mpTargetQ3":47,"scsTargetQ4":26,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"秀水鄉","mpTargetQ3":98,"scsTargetQ4":55,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"彰化市","mpTargetQ3":585,"scsTargetQ4":327,"mp3":391,"mp4":214,"scs":71,"cap":637,"pot":608},{"city":"彰化縣","district":"大村鄉","mpTargetQ3":52,"scsTargetQ4":29,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"員林市","mpTargetQ3":250,"scsTargetQ4":140,"mp3":159,"mp4":0,"scs":44,"cap":150,"pot":201},{"city":"彰化縣","district":"溪湖鎮","mpTargetQ3":73,"scsTargetQ4":41,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"芬園鄉","mpTargetQ3":24,"scsTargetQ4":14,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"花壇鄉","mpTargetQ3":96,"scsTargetQ4":54,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"北斗鎮","mpTargetQ3":53,"scsTargetQ4":30,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"埔鹽鄉","mpTargetQ3":39,"scsTargetQ4":22,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"埤頭鄉","mpTargetQ3":37,"scsTargetQ4":20,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"伸港鄉","mpTargetQ3":62,"scsTargetQ4":35,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"線西鄉","mpTargetQ3":36,"scsTargetQ4":20,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"大城鄉","mpTargetQ3":14,"scsTargetQ4":8,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"社頭鄉","mpTargetQ3":48,"scsTargetQ4":27,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"二林鎮","mpTargetQ3":61,"scsTargetQ4":34,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"和美鎮","mpTargetQ3":241,"scsTargetQ4":135,"mp3":109,"mp4":0,"scs":0,"cap":149,"pot":110},{"city":"彰化縣","district":"竹塘鄉","mpTargetQ3":13,"scsTargetQ4":8,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"彰化縣","district":"埔心鄉","mpTargetQ3":77,"scsTargetQ4":43,"mp3":0,"mp4":31,"scs":0,"cap":0,"pot":31},{"city":"彰化縣","district":"福興鄉","mpTargetQ3":71,"scsTargetQ4":39,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"南投縣","district":"埔里鎮","mpTargetQ3":149,"scsTargetQ4":83,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"南投縣","district":"鹿谷鄉","mpTargetQ3":18,"scsTargetQ4":10,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"南投縣","district":"南投市","mpTargetQ3":210,"scsTargetQ4":118,"mp3":44,"mp4":25,"scs":0,"cap":27,"pot":73},{"city":"南投縣","district":"水里鄉","mpTargetQ3":21,"scsTargetQ4":12,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"南投縣","district":"草屯鎮","mpTargetQ3":193,"scsTargetQ4":108,"mp3":112,"mp4":0,"scs":29,"cap":166,"pot":115},{"city":"南投縣","district":"集集鎮","mpTargetQ3":14,"scsTargetQ4":8,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"南投縣","district":"名間鄉","mpTargetQ3":44,"scsTargetQ4":24,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"南投縣","district":"竹山鎮","mpTargetQ3":66,"scsTargetQ4":37,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"古坑鄉","mpTargetQ3":37,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"台西鄉","mpTargetQ3":20,"scsTargetQ4":12,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"虎尾鎮","mpTargetQ3":139,"scsTargetQ4":78,"mp3":72,"mp4":0,"scs":16,"cap":180,"pot":74},{"city":"雲林縣","district":"元長鄉","mpTargetQ3":24,"scsTargetQ4":13,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"北港鎮","mpTargetQ3":68,"scsTargetQ4":38,"mp3":0,"mp4":63,"scs":0,"cap":0,"pot":63},{"city":"雲林縣","district":"褒忠鄉","mpTargetQ3":14,"scsTargetQ4":8,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"斗六市","mpTargetQ3":339,"scsTargetQ4":189,"mp3":156,"mp4":0,"scs":38,"cap":317,"pot":173},{"city":"雲林縣","district":"東勢鄉","mpTargetQ3":16,"scsTargetQ4":9,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"土庫鎮","mpTargetQ3":38,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"大埤鄉","mpTargetQ3":20,"scsTargetQ4":11,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"麥寮鄉","mpTargetQ3":59,"scsTargetQ4":33,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"林內鄉","mpTargetQ3":23,"scsTargetQ4":13,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"莿桐鄉","mpTargetQ3":50,"scsTargetQ4":28,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"西螺鎮","mpTargetQ3":60,"scsTargetQ4":34,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"四湖鄉","mpTargetQ3":19,"scsTargetQ4":11,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"崙背鄉","mpTargetQ3":31,"scsTargetQ4":17,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"口湖鄉","mpTargetQ3":24,"scsTargetQ4":13,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"雲林縣","district":"斗南鎮","mpTargetQ3":91,"scsTargetQ4":51,"mp3":0,"mp4":24,"scs":0,"cap":0,"pot":24},{"city":"雲林縣","district":"水林鄉","mpTargetQ3":25,"scsTargetQ4":14,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義市","district":"西區","mpTargetQ3":372,"scsTargetQ4":208,"mp3":260,"mp4":0,"scs":37,"cap":274,"pot":271},{"city":"嘉義市","district":"東區","mpTargetQ3":299,"scsTargetQ4":167,"mp3":271,"mp4":0,"scs":60,"cap":383,"pot":275},{"city":"嘉義縣","district":"朴子市","mpTargetQ3":64,"scsTargetQ4":36,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"民雄鄉","mpTargetQ3":173,"scsTargetQ4":97,"mp3":0,"mp4":122,"scs":0,"cap":0,"pot":122},{"city":"嘉義縣","district":"新港鄉","mpTargetQ3":35,"scsTargetQ4":20,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"竹崎鄉","mpTargetQ3":35,"scsTargetQ4":20,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"梅山鄉","mpTargetQ3":21,"scsTargetQ4":12,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"義竹鄉","mpTargetQ3":13,"scsTargetQ4":8,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"中埔鄉","mpTargetQ3":53,"scsTargetQ4":30,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"溪口鄉","mpTargetQ3":13,"scsTargetQ4":7,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"太保市","mpTargetQ3":72,"scsTargetQ4":40,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"鹿草鄉","mpTargetQ3":14,"scsTargetQ4":8,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"大林鎮","mpTargetQ3":51,"scsTargetQ4":28,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"布袋鎮","mpTargetQ3":29,"scsTargetQ4":16,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"嘉義縣","district":"水上鄉","mpTargetQ3":67,"scsTargetQ4":37,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"西港區","mpTargetQ3":37,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"北區","mpTargetQ3":416,"scsTargetQ4":233,"mp3":591,"mp4":0,"scs":132,"cap":561,"pot":663},{"city":"台南市","district":"柳營區","mpTargetQ3":31,"scsTargetQ4":17,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"善化區","mpTargetQ3":133,"scsTargetQ4":75,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"鹽水區","mpTargetQ3":30,"scsTargetQ4":17,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"玉井區","mpTargetQ3":18,"scsTargetQ4":10,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"歸仁區","mpTargetQ3":121,"scsTargetQ4":68,"mp3":90,"mp4":0,"scs":0,"cap":156,"pot":92},{"city":"台南市","district":"南區","mpTargetQ3":308,"scsTargetQ4":172,"mp3":371,"mp4":0,"scs":77,"cap":503,"pot":394},{"city":"台南市","district":"新化區","mpTargetQ3":63,"scsTargetQ4":35,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"安平區","mpTargetQ3":292,"scsTargetQ4":163,"mp3":278,"mp4":0,"scs":64,"cap":309,"pot":360},{"city":"台南市","district":"安南區","mpTargetQ3":459,"scsTargetQ4":256,"mp3":179,"mp4":0,"scs":50,"cap":107,"pot":211},{"city":"台南市","district":"佳里區","mpTargetQ3":115,"scsTargetQ4":64,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"麻豆區","mpTargetQ3":93,"scsTargetQ4":52,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"關廟區","mpTargetQ3":47,"scsTargetQ4":26,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"東山區","mpTargetQ3":17,"scsTargetQ4":10,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"中西區","mpTargetQ3":250,"scsTargetQ4":140,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"將軍區","mpTargetQ3":17,"scsTargetQ4":10,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"永康區","mpTargetQ3":849,"scsTargetQ4":474,"mp3":818,"mp4":85,"scs":181,"cap":1137,"pot":981},{"city":"台南市","district":"新營區","mpTargetQ3":124,"scsTargetQ4":69,"mp3":0,"mp4":113,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"東區","mpTargetQ3":565,"scsTargetQ4":316,"mp3":656,"mp4":0,"scs":121,"cap":957,"pot":680},{"city":"台南市","district":"新市區","mpTargetQ3":115,"scsTargetQ4":64,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"白河區","mpTargetQ3":30,"scsTargetQ4":16,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"下營區","mpTargetQ3":25,"scsTargetQ4":14,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"安定區","mpTargetQ3":62,"scsTargetQ4":35,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"六甲區","mpTargetQ3":28,"scsTargetQ4":16,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"學甲區","mpTargetQ3":30,"scsTargetQ4":17,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台南市","district":"仁德區","mpTargetQ3":259,"scsTargetQ4":145,"mp3":89,"mp4":83,"scs":19,"cap":134,"pot":173},{"city":"台南市","district":"官田區","mpTargetQ3":36,"scsTargetQ4":20,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"大樹區","mpTargetQ3":65,"scsTargetQ4":36,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"三民區","mpTargetQ3":1045,"scsTargetQ4":584,"mp3":1027,"mp4":0,"scs":223,"cap":1383,"pot":1214},{"city":"高雄市","district":"林園區","mpTargetQ3":89,"scsTargetQ4":50,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"湖內區","mpTargetQ3":50,"scsTargetQ4":28,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"路竹區","mpTargetQ3":117,"scsTargetQ4":65,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"阿蓮區","mpTargetQ3":38,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"美濃區","mpTargetQ3":38,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"苓雅區","mpTargetQ3":461,"scsTargetQ4":257,"mp3":469,"mp4":0,"scs":154,"cap":598,"pot":525},{"city":"高雄市","district":"小港區","mpTargetQ3":333,"scsTargetQ4":186,"mp3":184,"mp4":0,"scs":35,"cap":258,"pot":233},{"city":"高雄市","district":"旗津區","mpTargetQ3":23,"scsTargetQ4":13,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"茄萣區","mpTargetQ3":37,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"左營區","mpTargetQ3":770,"scsTargetQ4":430,"mp3":482,"mp4":93,"scs":111,"cap":340,"pot":675},{"city":"高雄市","district":"杉林區","mpTargetQ3":10,"scsTargetQ4":6,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"楠梓區","mpTargetQ3":672,"scsTargetQ4":376,"mp3":888,"mp4":0,"scs":225,"cap":1317,"pot":924},{"city":"高雄市","district":"仁武區","mpTargetQ3":336,"scsTargetQ4":188,"mp3":315,"mp4":0,"scs":86,"cap":194,"pot":344},{"city":"高雄市","district":"橋頭區","mpTargetQ3":153,"scsTargetQ4":85,"mp3":65,"mp4":0,"scs":16,"cap":78,"pot":67},{"city":"高雄市","district":"彌陀區","mpTargetQ3":22,"scsTargetQ4":12,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"鳥松區","mpTargetQ3":116,"scsTargetQ4":65,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"大寮區","mpTargetQ3":267,"scsTargetQ4":150,"mp3":91,"mp4":49,"scs":20,"cap":82,"pot":143},{"city":"高雄市","district":"新興區","mpTargetQ3":180,"scsTargetQ4":100,"mp3":158,"mp4":0,"scs":48,"cap":151,"pot":178},{"city":"高雄市","district":"前金區","mpTargetQ3":119,"scsTargetQ4":67,"mp3":147,"mp4":0,"scs":36,"cap":126,"pot":171},{"city":"高雄市","district":"鼓山區","mpTargetQ3":524,"scsTargetQ4":292,"mp3":627,"mp4":0,"scs":99,"cap":863,"pot":819},{"city":"高雄市","district":"永安區","mpTargetQ3":18,"scsTargetQ4":10,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"燕巢區","mpTargetQ3":60,"scsTargetQ4":34,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"岡山區","mpTargetQ3":259,"scsTargetQ4":145,"mp3":139,"mp4":96,"scs":16,"cap":119,"pot":254},{"city":"高雄市","district":"旗山區","mpTargetQ3":49,"scsTargetQ4":27,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"梓官區","mpTargetQ3":47,"scsTargetQ4":26,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"大社區","mpTargetQ3":89,"scsTargetQ4":50,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"鹽埕區","mpTargetQ3":58,"scsTargetQ4":33,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"高雄市","district":"鳳山區","mpTargetQ3":922,"scsTargetQ4":515,"mp3":671,"mp4":96,"scs":205,"cap":667,"pot":915},{"city":"高雄市","district":"前鎮區","mpTargetQ3":501,"scsTargetQ4":280,"mp3":538,"mp4":46,"scs":93,"cap":693,"pot":630},{"city":"屏東縣","district":"車城鄉","mpTargetQ3":10,"scsTargetQ4":5,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"萬丹鄉","mpTargetQ3":79,"scsTargetQ4":44,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"林邊鄉","mpTargetQ3":16,"scsTargetQ4":9,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"新埤鄉","mpTargetQ3":11,"scsTargetQ4":6,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"高樹鄉","mpTargetQ3":22,"scsTargetQ4":12,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"枋寮鄉","mpTargetQ3":31,"scsTargetQ4":17,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"屏東市","mpTargetQ3":308,"scsTargetQ4":172,"mp3":153,"mp4":73,"scs":48,"cap":154,"pot":284},{"city":"屏東縣","district":"長治鄉","mpTargetQ3":49,"scsTargetQ4":28,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"九如鄉","mpTargetQ3":31,"scsTargetQ4":17,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"佳冬鄉","mpTargetQ3":21,"scsTargetQ4":12,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"鹽埔鄉","mpTargetQ3":36,"scsTargetQ4":20,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"麟洛鄉","mpTargetQ3":16,"scsTargetQ4":9,"mp3":0,"mp4":157,"scs":0,"cap":0,"pot":157},{"city":"屏東縣","district":"東港鎮","mpTargetQ3":68,"scsTargetQ4":38,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"里港鄉","mpTargetQ3":37,"scsTargetQ4":21,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"南州鄉","mpTargetQ3":12,"scsTargetQ4":7,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"新園鄉","mpTargetQ3":44,"scsTargetQ4":24,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"潮州鎮","mpTargetQ3":93,"scsTargetQ4":52,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"內埔鄉","mpTargetQ3":88,"scsTargetQ4":49,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"屏東縣","district":"恆春鎮","mpTargetQ3":63,"scsTargetQ4":35,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"宜蘭縣","district":"羅東鎮","mpTargetQ3":115,"scsTargetQ4":64,"mp3":176,"mp4":0,"scs":46,"cap":167,"pot":207},{"city":"宜蘭縣","district":"三星鄉","mpTargetQ3":41,"scsTargetQ4":23,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"宜蘭縣","district":"蘇澳鎮","mpTargetQ3":61,"scsTargetQ4":34,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"宜蘭縣","district":"頭城鎮","mpTargetQ3":46,"scsTargetQ4":26,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"宜蘭縣","district":"冬山鄉","mpTargetQ3":100,"scsTargetQ4":56,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"宜蘭縣","district":"五結鄉","mpTargetQ3":83,"scsTargetQ4":46,"mp3":0,"mp4":15,"scs":0,"cap":0,"pot":15},{"city":"宜蘭縣","district":"宜蘭市","mpTargetQ3":282,"scsTargetQ4":158,"mp3":241,"mp4":92,"scs":0,"cap":271,"pot":355},{"city":"宜蘭縣","district":"礁溪鄉","mpTargetQ3":71,"scsTargetQ4":40,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"宜蘭縣","district":"員山鄉","mpTargetQ3":50,"scsTargetQ4":28,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"花蓮縣","district":"吉安鄉","mpTargetQ3":149,"scsTargetQ4":83,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"花蓮縣","district":"花蓮市","mpTargetQ3":213,"scsTargetQ4":119,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"花蓮縣","district":"新城鄉","mpTargetQ3":43,"scsTargetQ4":24,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0},{"city":"台東縣","district":"台東市","mpTargetQ3":228,"scsTargetQ4":127,"mp3":0,"mp4":0,"scs":0,"cap":0,"pot":0}];
+
+const WEIGHTS={k4:0.25,k2:0.20,k1:0.15,k3:0.15,k5:0.15,k6:0.10};
+const FPL_TARGET=0.15;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const band=h=>h>=90?"green":h>=70?"yellow":"red";
+const COL={green:"#27d97f",yellow:"#ffc83d",red:"#ff4d62",grey:"#33425f"};
+const pct=v=>(v*100).toFixed(0)+"%";
+const num=v=>v>=1000?(v/1000).toFixed(v>=10000?0:1)+"k":Math.round(v);
+const norm=s=>(s||"").trim().replace(/臺/g,"台");
+
+function compute(d){
+  const mp3=+d.mp3||0, mp4=+d.mp4||0, scs=+d.scs||0, cap=+d.cap||0, pot=+d.pot||0;
+  const mpTgt=+d.mpTargetQ3||0, scsTgt=+d.scsTargetQ4||0;
+  const mpO=mp3+mp4, tot=mp3+mp4+scs;
+  const k1= pot? cap/pot:0;
+  const k2= pot? mp3/pot:0;
+  const k3= mpO? mp4/mpO:0;
+  const k4= pot? mpO/pot:0;
+  const k5= mpTgt? mp3/mpTgt:0;
+  const k6= scsTgt? scs/scsTgt:0;
+  const s1=clamp(k1,0,1)*100, s2=clamp(k2,0,1)*100, s4=clamp(k4,0,1)*100,
+        s5=clamp(k5,0,1)*100, s6=clamp(k6,0,1)*100;
+  const s3= k3<=FPL_TARGET?100:clamp(100-(k3-FPL_TARGET)*300,0,100);
+  const health=WEIGHTS.k1*s1+WEIGHTS.k2*s2+WEIGHTS.k3*s3+WEIGHTS.k4*s4+WEIGHTS.k5*s5+WEIGHTS.k6*s6;
+  return {...d,mp3,mp4,scs,cap,pot,mpTgt,scsTgt,mpO,tot,k1,k2,k3,k4,k5,k6,
+          s1,s2,s3,s4,s5,s6,health,growth:Math.max(0,1-k4)};
+}
+const hi=v=>v>=0.9?COL.green:v>=0.7?COL.yellow:COL.red;
+const LAYERS={
+  health:{name:"Area Health Score",sub:"紅黃綠燈總覽",icon:"🩺",desc:"6 KPI 加權",
+    val:d=>d.health,fmt:v=>v.toFixed(0),color:d=>COL[band(d.health)],
+    legend:[[COL.green,"🟢 健康 90–100"],[COL.yellow,"🟡 留意 70–89"],[COL.red,"🔴 風險 <70"],[COL.grey,"無資料 / 未上線"]]},
+  k1:{name:"KPI1 · Capacity-to-Demand",sub:"3PL 產能 / 潛在需求",icon:"⚙️",desc:"3PL Cap / Potential Demand",
+    val:d=>d.k1,fmt:pct,color:d=>d.k1>=1?COL.green:d.k1>=0.8?COL.yellow:COL.red,
+    legend:[[COL.green,"≥100% 產能足夠"],[COL.yellow,"80–100% 接近滿載"],[COL.red,"<80% 產能不足"],[COL.grey,"無資料"]]},
+  k2:{name:"KPI2 · Demand Coverage",sub:"覆蓋率",icon:"🎯",desc:"MP 3PL Orders / Potential Demand",
+    val:d=>d.k2,fmt:pct,color:d=>hi(d.k2),
+    legend:[[COL.green,"≥90% 覆蓋佳"],[COL.yellow,"70–90%"],[COL.red,"<70% 覆蓋不足"],[COL.grey,"無資料"]]},
+  k4:{name:"KPI4 · Service Availability",sub:"服務可用度",icon:"📡",desc:"MP(3PL+4PL) / Potential Demand",
+    val:d=>d.k4,fmt:pct,color:d=>hi(d.k4),
+    legend:[[COL.green,"≥90% 服務充分"],[COL.yellow,"70–90%"],[COL.red,"<70%"],[COL.grey,"無資料"]]},
+  k3:{name:"KPI3 · 4PL Dependency",sub:"4PL 依賴度",icon:"🔗",desc:"MP 4PL / MP Orders (≤15%)",
+    val:d=>d.k3,fmt:pct,color:d=>d.k3<=0.15?COL.green:d.k3<=0.30?COL.yellow:COL.red,
+    legend:[[COL.green,"≤15% 達標"],[COL.yellow,"15–30% 偏高"],[COL.red,">30% 過度依賴"],[COL.grey,"無資料"]]},
+  k5:{name:"KPI5 · MP Target Achv",sub:"MP 年底目標達成",icon:"📦",desc:"MP 3PL / Normal Parcel Target",
+    val:d=>d.k5,fmt:pct,color:d=>hi(d.k5),
+    legend:[[COL.green,"≥90% 接近/達標"],[COL.yellow,"70–90%"],[COL.red,"<70% 落後"],[COL.grey,"無資料"]]},
+  k6:{name:"KPI6 · SCS Target Achv",sub:"SCS 目標達成",icon:"🚚",desc:"SCS Orders / SCS Target",
+    val:d=>d.k6,fmt:pct,color:d=>hi(d.k6),
+    legend:[[COL.green,"≥90%"],[COL.yellow,"70–90%"],[COL.red,"<70% 落後"],[COL.grey,"無資料"]]}
+};
+
+let DATA={}, FEATURES=[], COUNTIES=new Set(), curLayer="health", curCounty="ALL", selected=null;
+function loadData(arr){DATA={};arr.forEach(d=>{const c=compute(d);DATA[norm(d.city)+"|"+norm(d.district)]=c;});}
+function rec(f){return DATA[norm(f.properties.COUNTYNAME)+"|"+norm(f.properties.TOWNNAME)];}
+function isActive(r){return r && (r.mp3||r.mp4||r.scs||r.pot);}
+
+function buildLayers(){
+  const box=d3.select("#layers");
+  Object.entries(LAYERS).forEach(([k,L])=>{
+    box.append("div").attr("class","layerbtn"+(k===curLayer?" active":"")).on("click",()=>setLayer(k))
+      .html(`<div class="ttl"><span class="ic">${L.icon}</span>${L.name}</div><div class="ds">${L.sub} · ${L.desc}</div>`);
+  });
+}
+function setLayer(k){curLayer=k;
+  d3.selectAll(".layerbtn").classed("active",(d,i)=>Object.keys(LAYERS)[i]===k);
+  d3.select("#mapTitle").html(`${LAYERS[k].name} <span>· ${LAYERS[k].sub}</span>`);
+  paint();buildLegend();}
+function buildLegend(){
+  const L=LAYERS[curLayer],box=d3.select("#legend").html("");
+  box.append("div").attr("class","section-label").text("Legend · 圖例");
+  L.legend.forEach(([c,t])=>{const r=box.append("div").attr("class","row");
+    r.append("div").attr("class","sw").style("background",c);r.append("div").text(t);});
+}
+
+const svg=d3.select("#map"),g=svg.append("g");let path,proj;
+function drawMap(geo){
+  FEATURES=geo.features;
+  FEATURES.forEach(f=>COUNTIES.add(norm(f.properties.COUNTYNAME)));
+  const cf=d3.select("#countyFilter");
+  [...COUNTIES].sort().forEach(c=>cf.append("option").attr("value",c).text(c));
+  cf.on("change",function(){curCounty=this.value;zoomCounty();paint();renderFooter();renderWatch();});
+  const w=svg.node().clientWidth,h=svg.node().clientHeight;
+  proj=d3.geoMercator().fitSize([w,h],geo);path=d3.geoPath(proj);
+  g.selectAll("path").data(FEATURES).join("path").attr("d",path)
+    .on("mousemove",showTip).on("mouseleave",hideTip).on("click",(e,d)=>selectArea(d));
+  paint();buildLegend();renderFooter();renderWatch();
+  d3.select("#loading").style("display","none");
+}
+function zoomCounty(){
+  const w=svg.node().clientWidth,h=svg.node().clientHeight;
+  const subset=curCounty==="ALL"?{type:"FeatureCollection",features:FEATURES}
+    :{type:"FeatureCollection",features:FEATURES.filter(f=>norm(f.properties.COUNTYNAME)===curCounty)};
+  if(!subset.features.length)return;
+  proj.fitSize([w*.95,h*.95],subset);path=d3.geoPath(proj);
+  g.selectAll("path").transition().duration(600).attr("d",path);
+}
+function paint(){
+  const L=LAYERS[curLayer];
+  g.selectAll("path").transition().duration(350).attr("fill",d=>{
+    if(curCounty!=="ALL"&&norm(d.properties.COUNTYNAME)!==curCounty)return"#0b1422";
+    const r=rec(d); if(!isActive(r))return COL.grey; return L.color(r);
+  }).attr("opacity",d=>(curCounty!=="ALL"&&norm(d.properties.COUNTYNAME)!==curCounty)?0.25:1);
+  renderKPI();
+}
+const tip=d3.select("#tip");
+function showTip(e,d){
+  const r=rec(d);
+  const head=`<h4>${d.properties.TOWNNAME}`;
+  if(!isActive(r)){tip.style("opacity",1).style("left",(e.clientX+16)+"px").style("top",(e.clientY+14)+"px")
+    .html(`${head}<span class="pill" style="background:${COL.grey};color:#fff">N/A</span></h4>
+      <div class="r"><span>${norm(d.properties.COUNTYNAME)}</span><b>無資料 / 未上線</b></div>`);return;}
+  const b=band(r.health);
+  tip.style("opacity",1).style("left",(e.clientX+16)+"px").style("top",(e.clientY+14)+"px")
+    .html(`${head}<span class="pill" style="background:${COL[b]}">${r.health.toFixed(0)}</span></h4>
+      <div class="r"><span>${norm(d.properties.COUNTYNAME)}</span><b></b></div>
+      <div class="r"><span>K1 產能/需求</span><b>${pct(r.k1)}</b></div>
+      <div class="r"><span>K2 覆蓋率</span><b>${pct(r.k2)}</b></div>
+      <div class="r"><span>K4 服務可用</span><b>${pct(r.k4)}</b></div>
+      <div class="r"><span>K3 4PL 依賴</span><b style="color:${r.k3<=.15?'var(--green)':'var(--red)'}">${pct(r.k3)}</b></div>
+      <div class="r"><span>K5 MP 達成</span><b>${pct(r.k5)}</b></div>
+      <div class="r"><span>K6 SCS 達成</span><b>${pct(r.k6)}</b></div>`);
+}
+function hideTip(){tip.style("opacity",0);}
+function selectArea(d){selected=norm(d.properties.COUNTYNAME)+"|"+norm(d.properties.TOWNNAME);
+  g.selectAll("path").classed("sel",p=>p===d);showTab("detail");renderDetail();}
+
+function ring(s){const b=band(s),c=COL[b],R=36,C=2*Math.PI*R,off=C*(1-s/100);
+  return `<svg class="scorering" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${R}" fill="none" stroke="#1c2942" stroke-width="9"/>
+    <circle cx="42" cy="42" r="${R}" fill="none" stroke="${c}" stroke-width="9" stroke-linecap="round"
+    stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 42 42)"/>
+    <text x="42" y="46" text-anchor="middle" fill="#fff" font-size="22" font-weight="800">${s.toFixed(0)}</text>
+    <text x="42" y="60" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${b==='green'?'HEALTHY':b==='yellow'?'WATCH':'RISK'}</text></svg>`;}
+function mrow(q,fmt,score,tgt,col,ans){const c=col||COL[band(score)],w=Math.min(100,score);
+  return `<div class="metric"><div class="top"><span class="q">${q}</span><span class="v" style="color:${c}">${fmt}</span></div>
+    <div class="bar"><i style="width:${w}%;background:${c}"></i>${tgt!=null?`<span class="tgt" style="left:${tgt}%"></span>`:""}</div>
+    <div class="ans">${ans}</div></div>`;}
+function renderDetail(){
+  const pane=d3.select("#detailPane");
+  if(!selected||!DATA[selected]){pane.html('<div class="empty">點擊地圖上的任一區域<br>查看 6 大 KPI 與健康分數。</div>');return;}
+  const r=DATA[selected];
+  if(!isActive(r)){pane.html(`<div class="empty"><b style="color:var(--txt)">${r.district}</b> · ${r.city}<br><br>此區目前無訂單資料（未上線或非服務範圍）。</div>`);return;}
+  const b=band(r.health);
+  pane.html(`
+    <div class="scorebig">${ring(r.health)}
+      <div class="scoremeta"><div class="nm">${r.district}</div><div class="cty">${r.city}</div>
+      <span class="badge" style="background:${COL[b]}">${b==='green'?'🟢 健康':b==='yellow'?'🟡 需留意':'🔴 風險'}</span></div></div>
+    ${mrow('KPI1 · 產能/需求 (15%)',pct(r.k1),r.s1,null,r.k1>=1?COL.green:r.k1>=.8?COL.yellow:COL.red,`3PL Cap ${num(r.cap)} / 需求 ${num(r.pot)} ${r.k1>=1?'✅ 產能足':'⚠️ 產能吃緊'}`)}
+    ${mrow('KPI2 · 覆蓋率 (20%)',pct(r.k2),r.s2,null,null,`MP 3PL ${num(r.mp3)} / 潛在 ${num(r.pot)}，還有 <b style="color:var(--accent2)">${pct(r.growth)}</b> 成長空間`)}
+    ${mrow('KPI4 · 服務可用度 (25%)',pct(r.k4),r.s4,null,null,`MP(3PL+4PL) ${num(r.mpO)} / 潛在 ${num(r.pot)}`)}
+    ${mrow('KPI3 · 4PL 依賴 (15%)',pct(r.k3),r.s3,15,r.k3<=.15?COL.green:r.k3<=.3?COL.yellow:COL.red,r.k3<=.15?'✅ ≤15% 目標內':'⚠️ 超過 15% 目標 (4PL '+num(r.mp4)+' 單)')}
+    ${mrow('KPI5 · MP 年底目標 (15%)',pct(r.k5),r.s5,null,null,`MP 3PL ${num(r.mp3)} / 目標 ${num(r.mpTgt)} ${r.k5>=1?'✅ 達標':'未達標'}`)}
+    ${mrow('KPI6 · SCS 目標 (10%)',pct(r.k6),r.s6,null,null,`SCS ${num(r.scs)} / 目標 ${num(r.scsTgt)} ${r.k6>=1?'✅ 達標':'未達標'}`)}
+    <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px;font-size:10px;color:var(--muted);line-height:1.7">
+      Health = 25%·K4 + 20%·K2 + 15%·K1 + 15%·K3(反向) + 15%·K5 + 10%·K6<br>
+      分數 → K1 ${r.s1.toFixed(0)} · K2 ${r.s2.toFixed(0)} · K3 ${r.s3.toFixed(0)} · K4 ${r.s4.toFixed(0)} · K5 ${r.s5.toFixed(0)} · K6 ${r.s6.toFixed(0)}</div>`);
+}
+function renderWatch(){
+  const arr=Object.values(DATA).filter(d=>isActive(d)&&(curCounty==="ALL"||d.city===curCounty))
+    .sort((a,b)=>a.health-b.health).slice(0,45);
+  const pane=d3.select("#watchPane").html("");
+  pane.append("div").attr("class","section-label").style("margin-bottom","8px").text("最需要關注的區域（健康由低到高）");
+  arr.forEach(d=>{const b=band(d.health);
+    const row=pane.append("div").attr("class","wrow").on("click",()=>{
+      selected=d.city+"|"+d.district;
+      g.selectAll("path").classed("sel",p=>norm(p.properties.COUNTYNAME)+"|"+norm(p.properties.TOWNNAME)===selected);
+      showTab("detail");renderDetail();});
+    row.html(`<span class="wlight" style="background:${COL[b]};box-shadow:0 0 8px ${COL[b]}"></span>
+      <span class="wnm">${d.district}<br><small>${d.city} · 4PL ${pct(d.k3)} · 覆蓋 ${pct(d.k2)} · 產能 ${pct(d.k1)}</small></span>
+      <span class="wsc" style="color:${COL[b]}">${d.health.toFixed(0)}</span>`);});
+}
+function showTab(t){d3.selectAll(".tab").classed("active",false);
+  d3.select(t==="detail"?"#tabDetail":"#tabWatch").classed("active",true);
+  d3.select("#detailPane").style("display",t==="detail"?"block":"none");
+  d3.select("#watchPane").style("display",t==="watch"?"block":"none");}
+d3.select("#tabDetail").on("click",()=>showTab("detail"));
+d3.select("#tabWatch").on("click",()=>{showTab("watch");renderWatch();});
+
+function aggregate(){
+  // ratios sum over ALL planned areas in scope (matches sheet's Overall row: targets
+  // include not-yet-live areas); traffic-light counts use live areas only.
+  const scope=Object.values(DATA).filter(d=>curCounty==="ALL"||d.city===curCounty);
+  const live=scope.filter(isActive);
+  const S=f=>scope.reduce((a,d)=>a+f(d),0);
+  const mp3=S(d=>d.mp3),mp4=S(d=>d.mp4),scs=S(d=>d.scs),cap=S(d=>d.cap),pot=S(d=>d.pot),
+        mpT=S(d=>d.mpTgt),scsT=S(d=>d.scsTgt),mpO=mp3+mp4;
+  const g=live.filter(d=>band(d.health)==="green").length,
+        y=live.filter(d=>band(d.health)==="yellow").length,
+        rd=live.filter(d=>band(d.health)==="red").length;
+  return {n:live.length,total:scope.length,
+    k1:pot?cap/pot:0,k2:pot?mp3/pot:0,k3:mpO?mp4/mpO:0,k4:pot?mpO/pot:0,k5:mpT?mp3/mpT:0,k6:scsT?scs/scsT:0,
+    avgHealth:live.length?live.reduce((a,d)=>a+d.health,0)/live.length:0,g,y,rd,mp4,mpO,pot};
+}
+function renderKPI(){
+  const a=aggregate(),box=d3.select("#kpibar").html("");
+  const card=(l,v,c)=>box.append("div").attr("class","kpi").html(`<div class="lbl">${l}</div><div class="val" style="color:${c||'var(--txt)'}">${v}</div>`);
+  card("K1 Cap/Demand",pct(a.k1),a.k1>=1?"var(--green)":a.k1>=.8?"var(--yellow)":"var(--red)");
+  card("K2 Coverage",pct(a.k2),a.k2>=.9?"var(--green)":a.k2>=.7?"var(--yellow)":"var(--red)");
+  card("K4 Service Avl",pct(a.k4),a.k4>=.9?"var(--green)":a.k4>=.7?"var(--yellow)":"var(--red)");
+  card("K3 4PL Dep",pct(a.k3),a.k3<=.15?"var(--green)":a.k3<=.3?"var(--yellow)":"var(--red)");
+  card("K5 MP Target",pct(a.k5),a.k5>=.9?"var(--green)":a.k5>=.7?"var(--yellow)":"var(--red)");
+  card("K6 SCS Target",pct(a.k6),a.k6>=.9?"var(--green)":a.k6>=.7?"var(--yellow)":"var(--red)");
+  card("Avg Health",a.avgHealth.toFixed(0),COL[band(a.avgHealth)]);
+  box.append("div").attr("class","kpi").html(`<div class="lbl">Areas 🟢🟡🔴</div>
+    <div class="val" style="font-size:15px"><span style="color:var(--green)">${a.g}</span> <span style="color:var(--yellow)">${a.y}</span> <span style="color:var(--red)">${a.rd}</span><small>/${a.n}</small></div>`);
+}
+function renderFooter(){
+  const a=aggregate(),f=d3.select("#footer").html(""),scope=curCounty==="ALL"?"全台灣":curCounty;
+  const Q=(h,v,col,fo,ans)=>f.append("div").attr("class","qcard")
+    .html(`<div class="qh">${h} · ${scope}</div><div class="qv" style="color:${col}">${v}</div><div class="qf">${fo}</div><div class="qa">${ans}</div>`);
+  Q("KPI1 產能夠嗎？",pct(a.k1),a.k1>=1?"var(--green)":a.k1>=.8?"var(--yellow)":"var(--red)","3PL Cap / Potential Demand",a.k1>=1?"✅ 產能足夠":`產能僅及需求 ${pct(a.k1)}`);
+  Q("KPI2 還有成長空間？",pct(a.k2),a.k2>=.9?"var(--green)":a.k2>=.7?"var(--yellow)":"var(--red)","MP 3PL Orders / Potential",`還有 ${pct(Math.max(0,1-a.k2))} 覆蓋空間`);
+  Q("KPI4 服務可用度",pct(a.k4),a.k4>=.9?"var(--green)":a.k4>=.7?"var(--yellow)":"var(--red)","MP(3PL+4PL) / Potential",`滿足潛在需求的 ${pct(a.k4)}`);
+  Q("KPI3 太依賴 4PL？",pct(a.k3),a.k3<=.15?"var(--green)":"var(--red)","MP 4PL / MP Orders (≤15%)",a.k3<=.15?"✅ 目標內":`⚠️ 超標 ${pct(a.k3-.15)}`);
+  Q("KPI5 MP 年底達標？",pct(a.k5),a.k5>=.9?"var(--green)":a.k5>=.7?"var(--yellow)":"var(--red)","MP 3PL / Normal Parcel Target",a.k5>=1?"✅ 已達標":`差 ${pct(Math.max(0,1-a.k5))}`);
+  Q("KPI6 SCS 目標？",pct(a.k6),a.k6>=.9?"var(--green)":a.k6>=.7?"var(--yellow)":"var(--red)","SCS Orders / SCS Target",a.k6>=1?"✅ 已達標":`差 ${pct(Math.max(0,1-a.k6))}`);
+  Q("總體健康",a.avgHealth.toFixed(0),COL[band(a.avgHealth)],"6 KPI 加權 (0–100)",`🟢${a.g} 🟡${a.y} 🔴${a.rd} / ${a.n} 區`);
+}
+
+function downloadTemplate(){
+  const hdr=["city","district","MP Normal Parcel Target (Q3'26)","SCS Target (Q4'26)","MP Orders 3PL","MP Orders 4PL","SCS Orders","3PL Capacity","MP Potential Demand"];
+  const rows=Object.values(DATA).map(d=>[d.city,d.district,d.mpTgt,d.scsTgt,d.mp3,d.mp4,d.scs,d.cap,d.pot]);
+  const csv="﻿"+[hdr.join(","),...rows.map(r=>r.join(","))].join("\n");
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+  a.download="SPX_HD_data_template.csv";a.click();
+}
+function parseCSV(text){
+  const lines=text.replace(/^﻿/,"").split(/\r?\n/).filter(l=>l.trim());
+  const hdr=lines[0].split(",").map(s=>s.trim().toLowerCase());
+  const find=arr=>{for(const n of arr){const i=hdr.findIndex(h=>h.includes(n));if(i>=0)return i;}return -1;};
+  const ci={city:find(["city","縣市"]),dist:find(["district","區"]),mt:find(["normal parcel","mp normal","mp target"]),
+    st:find(["scs target"]),m3:find(["3pl orders","mp orders 3pl","orders 3pl"]),m4:find(["4pl orders","mp orders 4pl","orders 4pl"]),
+    so:find(["scs orders"]),cap:find(["3pl capacity","capacity"]),pot:find(["potential"])};
+  const arr=[];let ok=0;
+  for(let i=1;i<lines.length;i++){const c=lines[i].split(",");const dist=(c[ci.dist]||"").trim();if(!dist)continue;
+    arr.push({city:(c[ci.city]||"").trim(),district:dist,mpTargetQ3:+c[ci.mt]||0,scsTargetQ4:+c[ci.st]||0,
+      mp3:+c[ci.m3]||0,mp4:+c[ci.m4]||0,scs:+c[ci.so]||0,cap:+c[ci.cap]||0,pot:+c[ci.pot]||0});ok++;}
+  loadData(arr);d3.select("#dataSrc").text("我的 CSV ("+ok+" 區)");
+  zoomCounty();paint();renderFooter();renderWatch();renderDetail();
+  alert("已載入 "+ok+" 區資料，依 city+district 對應地圖。");
+}
+d3.select("#csv").on("change",function(){const f=this.files[0];if(!f)return;
+  const r=new FileReader();r.onload=e=>parseCSV(e.target.result);r.readAsText(f);});
+d3.select("#tplBtn").on("click",downloadTemplate);
+d3.select("#demoBtn").on("click",()=>{loadData(REAL_DATA);d3.select("#dataSrc").text("真實資料 June'26");
+  paint();renderFooter();renderWatch();renderDetail();});
+
+function tick(){const d=new Date();d3.select("#clock").text(d.toLocaleTimeString("en-GB"));
+  d3.select("#date").text(d.toLocaleDateString("zh-TW",{year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}));}
+setInterval(tick,1000);tick();
+
+loadData(REAL_DATA);
+buildLayers();
+d3.json(GEO_URL).then(drawMap).catch(err=>{
+  d3.select("#loading").html(`<div style="color:var(--red);max-width:340px">⚠️ 無法載入地圖底圖。<br><br>
+    需連線載入台灣鄉鎮市區地圖 (g0v 開放資料 / jsDelivr CDN)。請確認可連到 <b>cdn.jsdelivr.net</b> 後重新整理。<br><br><small>${err}</small></div>`);
+});
+window.addEventListener("resize",()=>{if(path)zoomCounty();});
+</script>
+</body>
+</html>

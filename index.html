@@ -1,483 +1,1068 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SPX HD Network Control Tower</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>供應商門市招募平台</title>
+<!--
+  ============================================================================
+  供應商門市招募平台 (Supplier Store Recruitment Platform)
+  ----------------------------------------------------------------------------
+  純前端單頁 HTML，可直接部署到 GitHub Pages。
+  資料目前以 JavaScript Array 模擬，日後可替換為：
+    - Google Sheets (透過 Apps Script Web App 當作 REST API)
+    - SeaTalk Webhook (替換 sendSeaTalkNotification 內部實作)
+
+  ★ 串接重點都已用「TODO: 串接」註解標記，搜尋 "TODO: 串接" 即可找到。
+  ============================================================================
+-->
 <style>
-:root{ --bg:#070b14; --panel:#0d1422; --panel2:#111b2e; --line:#1c2942; --txt:#cdd9ee; --muted:#6f82a3; --accent:#1cc8ff; --accent2:#7af0c0; --green:#27d97f; --yellow:#ffc83d; --red:#ff4d62; --grey:#33425f; --glow:0 0 18px rgba(28,200,255,.25); }
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{
-  background:
-    radial-gradient(900px 500px at 80% -10%, rgba(28,200,255,.07), transparent),
-    radial-gradient(700px 500px at 0% 110%, rgba(122,240,192,.05), transparent),
-    var(--bg);
-  color:var(--txt);font-family:"Segoe UI",Roboto,"Noto Sans TC",system-ui,sans-serif;
-  font-size:13px;overflow:hidden;
-}
-.app{display:grid;grid-template-rows:auto 1fr auto;height:100vh}
-header{display:flex;align-items:center;gap:18px;padding:10px 18px;border-bottom:1px solid var(--line);
-  background:linear-gradient(180deg,#0c1626,#0a1120)}
-.brand{display:flex;align-items:center;gap:12px;min-width:320px}
-.logo{width:34px;height:34px;border-radius:8px;background:conic-gradient(from 0deg,#1cc8ff,#7af0c0,#1cc8ff);
-  display:grid;place-items:center;font-weight:800;color:#04121d;box-shadow:var(--glow)}
-.brand h1{font-size:15px;letter-spacing:.5px}
-.brand .sub{font-size:10.5px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
-.kpibar{display:flex;gap:8px;flex:1;flex-wrap:wrap;justify-content:center}
-.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 11px;min-width:96px}
-.kpi .lbl{font-size:9px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase}
-.kpi .val{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
-.kpi .val small{font-size:10px;font-weight:600;color:var(--muted)}
-.clock{text-align:right;min-width:150px;font-variant-numeric:tabular-nums}
-.clock .t{font-size:17px;font-weight:700;color:var(--accent)}
-.clock .d{font-size:10px;color:var(--muted);letter-spacing:1px}
-.live{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:var(--green)}
-.live .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 1.6s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-main{display:grid;grid-template-columns:248px 1fr 348px;gap:12px;padding:12px;overflow:hidden}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
-.panel h2{font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--accent);
-  padding:10px 12px;border-bottom:1px solid var(--line);background:var(--panel2)}
-.panel .body{padding:11px 12px;overflow:auto}
-.layerbtn{display:flex;flex-direction:column;gap:2px;width:100%;text-align:left;cursor:pointer;
-  background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-bottom:7px;color:var(--txt);transition:.15s}
-.layerbtn:hover{border-color:var(--accent);transform:translateX(2px)}
-.layerbtn.active{border-color:var(--accent);background:linear-gradient(90deg,rgba(28,200,255,.16),transparent);box-shadow:var(--glow)}
-.layerbtn .ttl{font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px}
-.layerbtn .ds{font-size:9.5px;color:var(--muted)}
-.layerbtn .ic{width:16px;text-align:center}
-.section-label{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin:6px 0 8px}
-select{width:100%;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font-size:12px}
-.legend{margin-top:12px}
-.legend .row{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:11px}
-.legend .sw{width:16px;height:11px;border-radius:3px;flex:none}
-.btn{display:block;width:100%;text-align:center;cursor:pointer;background:linear-gradient(90deg,#1cc8ff,#7af0c0);
-  color:#04121d;font-weight:700;border:none;border-radius:8px;padding:9px;margin-top:8px;font-size:12px}
-.btn.ghost{background:var(--panel2);color:var(--accent);border:1px solid var(--line)}
-.filehint{font-size:9.5px;color:var(--muted);margin-top:6px;line-height:1.5}
-.mapwrap{position:relative;flex:1;min-height:0}
-#map{width:100%;height:100%}
-#map path{stroke:#0a1322;stroke-width:.4px;cursor:pointer;transition:fill .25s,stroke .12s}
-#map path:hover{stroke:#fff;stroke-width:1.1px}
-#map path.sel{stroke:var(--accent);stroke-width:1.6px}
-.maptitle{position:absolute;top:10px;left:14px;font-size:13px;font-weight:700;text-shadow:0 1px 4px #000}
-.maptitle span{color:var(--muted);font-weight:500;font-size:11px}
-.maphint{position:absolute;bottom:10px;left:14px;font-size:10px;color:var(--muted)}
-.loading{position:absolute;inset:0;display:grid;place-items:center;text-align:center;color:var(--muted);font-size:12px}
-.spinner{width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px}
-@keyframes spin{to{transform:rotate(360deg)}}
-.tooltip{position:fixed;pointer-events:none;z-index:50;background:rgba(8,14,26,.96);border:1px solid var(--accent);
-  border-radius:9px;padding:9px 11px;font-size:11.5px;min-width:200px;box-shadow:0 8px 30px rgba(0,0,0,.6);opacity:0;transition:opacity .1s}
-.tooltip h4{font-size:12.5px;margin-bottom:6px;color:#fff;display:flex;justify-content:space-between;gap:10px;align-items:center}
-.tooltip .r{display:flex;justify-content:space-between;gap:14px;margin:2px 0;color:var(--muted)}
-.tooltip .r b{color:var(--txt);font-variant-numeric:tabular-nums}
-.pill{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:20px;color:#04121d}
-.scorebig{display:flex;align-items:center;gap:14px;padding:4px 2px 12px}
-.scorering{width:84px;height:84px;flex:none}
-.scoremeta .nm{font-size:16px;font-weight:800}
-.scoremeta .cty{font-size:11px;color:var(--muted)}
-.scoremeta .badge{display:inline-block;margin-top:6px;font-size:11px;font-weight:800;padding:3px 11px;border-radius:20px;color:#04121d}
-.metric{margin:10px 0}
-.metric .top{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px}
-.metric .q{color:var(--muted)}
-.metric .v{font-weight:800;font-size:14px;font-variant-numeric:tabular-nums}
-.bar{height:8px;border-radius:6px;background:var(--panel2);margin-top:5px;overflow:hidden;position:relative}
-.bar > i{display:block;height:100%;border-radius:6px}
-.bar .tgt{position:absolute;top:-2px;bottom:-2px;width:2px;background:#fff;opacity:.75}
-.ans{font-size:10px;color:var(--muted);margin-top:3px}
-.empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:12px;line-height:1.6}
-.watch .wrow{display:flex;align-items:center;gap:9px;padding:7px 6px;border-radius:8px;cursor:pointer;border:1px solid transparent}
-.watch .wrow:hover{background:var(--panel2);border-color:var(--line)}
-.watch .wlight{width:9px;height:9px;border-radius:50%;flex:none}
-.watch .wnm{flex:1;font-size:12px}
-.watch .wnm small{color:var(--muted);font-size:10px}
-.watch .wsc{font-weight:800;font-variant-numeric:tabular-nums}
-.tabs{display:flex;gap:6px;margin-bottom:8px}
-.tab{flex:1;text-align:center;font-size:11px;padding:6px;border-radius:7px;cursor:pointer;background:var(--panel2);border:1px solid var(--line);color:var(--muted)}
-.tab.active{color:var(--accent);border-color:var(--accent)}
-footer{border-top:1px solid var(--line);background:#0a1120;padding:9px 14px;display:flex;gap:9px;overflow-x:auto}
-.qcard{flex:1;min-width:158px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 11px}
-.qcard .qh{font-size:9.5px;color:var(--muted);letter-spacing:.3px}
-.qcard .qv{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
-.qcard .qf{font-size:9px;color:var(--muted);font-family:ui-monospace,monospace}
-.qcard .qa{font-size:10px;margin-top:2px}
-::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-thumb{background:#1d2c46;border-radius:6px}
-::-webkit-scrollbar-track{background:transparent}
+  /* ====================== 基礎變數與重置 ====================== */
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --border: #e3e6ea;
+    --text: #1f2733;
+    --text-soft: #6b7280;
+    --primary: #ee4d2d;      /* Shopee 主色 */
+    --primary-dark: #d8431f;
+    --primary-soft: #fff1ec;
+    --sidebar: #1f2733;
+    --sidebar-soft: #2c3645;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+    /* 狀態色 */
+    --red: #e53935;     --red-bg: #fdecea;
+    --green: #2e9e5b;   --green-bg: #e7f5ed;
+    --grey: #6b7280;    --grey-bg: #eef0f2;
+    --yellow: #d99100;  --yellow-bg: #fff6e0;
+    --orange: #e07a1f;  --orange-bg: #fff0e0;
+    --blue: #2563eb;    --blue-bg: #e8f0fe;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang TC", "Microsoft JhengHei", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  /* ====================== 版面結構 ====================== */
+  .layout { display: flex; min-height: 100vh; }
+  .sidebar {
+    width: 230px; background: var(--sidebar); color: #cfd6e0;
+    display: flex; flex-direction: column; flex-shrink: 0;
+    position: sticky; top: 0; height: 100vh;
+  }
+  .sidebar .brand {
+    padding: 20px 18px; font-size: 16px; font-weight: 700; color: #fff;
+    border-bottom: 1px solid var(--sidebar-soft); line-height: 1.3;
+  }
+  .sidebar .brand small { display:block; font-weight:400; font-size:11px; color:#8b97a8; margin-top:3px; }
+  .nav { flex: 1; padding: 10px 0; overflow-y: auto; }
+  .nav button {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    background: none; border: none; color: #cfd6e0; cursor: pointer;
+    padding: 11px 18px; font-size: 14px; text-align: left; border-left: 3px solid transparent;
+  }
+  .nav button:hover { background: var(--sidebar-soft); color: #fff; }
+  .nav button.active { background: var(--sidebar-soft); color: #fff; border-left-color: var(--primary); font-weight: 600; }
+  .nav button .badge { margin-left: auto; background: var(--primary); color:#fff; border-radius: 10px; font-size: 11px; padding: 1px 7px; }
+  .role-box { padding: 14px 18px; border-top: 1px solid var(--sidebar-soft); font-size: 12px; }
+  .role-box label { color:#8b97a8; display:block; margin-bottom:5px; }
+  .role-box select { width: 100%; padding: 6px; border-radius: 6px; border: 1px solid var(--sidebar-soft); background: var(--sidebar-soft); color: #fff; }
+  .role-box select option { color:#000; }
+
+  .main { flex: 1; min-width: 0; }
+  .topbar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 14px 24px; display: flex; align-items: center; gap: 14px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .topbar h1 { font-size: 18px; }
+  .topbar .who { margin-left:auto; font-size:12px; color: var(--text-soft); }
+  .topbar .who b { color: var(--text); }
+  .menu-toggle { display:none; background:none; border:1px solid var(--border); border-radius:6px; padding:6px 10px; cursor:pointer; font-size:16px; }
+  .content { padding: 24px; max-width: 1400px; }
+
+  /* ====================== KPI Cards ====================== */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .kpi {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .kpi .label { color: var(--text-soft); font-size: 12px; margin-bottom: 6px; }
+  .kpi .value { font-size: 26px; font-weight: 700; }
+  .kpi.accent .value { color: var(--primary); }
+
+  /* ====================== 篩選列 ====================== */
+  .filters {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; margin-bottom: 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+  }
+  .filters .field { display: flex; flex-direction: column; gap: 4px; }
+  .filters .field label { font-size: 11px; color: var(--text-soft); }
+  .filters select, .filters input {
+    padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background:#fff; min-width: 120px;
+  }
+  .filters .reset { align-self: flex-end; }
+
+  /* ====================== 表格 ====================== */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; margin-bottom: 18px; }
+  .card .card-head { padding: 14px 18px; border-bottom: 1px solid var(--border); font-weight: 600; display:flex; align-items:center; gap:10px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { background: #fafbfc; color: var(--text-soft); font-weight: 600; font-size: 12px; position: sticky; top: 0; }
+  tbody tr:hover { background: #fafbfc; }
+  td.note-cell { white-space: normal; max-width: 220px; color: var(--text-soft); }
+  .empty { padding: 30px; text-align: center; color: var(--text-soft); }
+
+  /* ====================== 標籤 / Badge ====================== */
+  .tag { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .tag.red { background: var(--red-bg); color: var(--red); }
+  .tag.green { background: var(--green-bg); color: var(--green); }
+  .tag.grey { background: var(--grey-bg); color: var(--grey); }
+  .tag.yellow { background: var(--yellow-bg); color: var(--yellow); }
+  .tag.orange { background: var(--orange-bg); color: var(--orange); }
+  .tag.blue { background: var(--blue-bg); color: var(--blue); }
+  .tag.expired { background: var(--red-bg); color: var(--red); border: 1px dashed var(--red); }
+
+  /* ====================== 按鈕 ====================== */
+  .btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 13px; color: var(--text); }
+  .btn:hover { background: #f4f5f7; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover { background: var(--primary-dark); }
+  .btn.success { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn.danger { background: #fff; border-color: var(--red); color: var(--red); }
+  .btn.danger:hover { background: var(--red-bg); }
+  .btn.sm { padding: 4px 9px; font-size: 12px; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* ====================== Tabs ====================== */
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+  .tabs button { padding: 8px 14px; border: 1px solid var(--border); background: #fff; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .tabs button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .tabs button .cnt { opacity:.8; }
+
+  /* ====================== Modal ====================== */
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px; }
+  .modal-mask.show { display: flex; }
+  .modal { background: #fff; border-radius: 12px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+  .modal h3 { padding: 18px 20px; border-bottom: 1px solid var(--border); font-size: 16px; }
+  .modal .body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .modal .field { display: flex; flex-direction: column; gap: 5px; }
+  .modal .field label { font-size: 12px; color: var(--text-soft); }
+  .modal .field input, .modal .field select, .modal .field textarea {
+    padding: 9px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; font-family: inherit;
+  }
+  .modal .field input[readonly] { background: #f4f5f7; color: var(--text-soft); }
+  .modal .foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+  .modal .hint { font-size: 12px; color: var(--text-soft); background: var(--primary-soft); padding: 10px; border-radius: 6px; }
+
+  /* ====================== 規則說明 ====================== */
+  .rules h2 { font-size: 16px; margin: 22px 0 10px; }
+  .rules h2:first-child { margin-top: 0; }
+  .rules p, .rules li { color: var(--text); margin-bottom: 6px; }
+  .rules ul { padding-left: 20px; }
+  .rule-item { display:flex; gap:10px; padding:10px 0; border-bottom:1px dashed var(--border); }
+  .rule-item .tag { flex-shrink:0; height: fit-content; }
+
+  /* ====================== Workflow stepper ====================== */
+  .stepper { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .stepper .step { font-size:11px; padding:2px 8px; border-radius:12px; background:var(--grey-bg); color:var(--grey); }
+  .stepper .step.done { background:var(--green-bg); color:var(--green); }
+  .stepper .step.now { background:var(--primary); color:#fff; }
+  .stepper .arrow { color:var(--text-soft); font-size:11px; }
+
+  /* ====================== Toast ====================== */
+  #toast { position: fixed; right: 20px; bottom: 20px; display:flex; flex-direction:column; gap:8px; z-index:200; }
+  .toast-item { background:#1f2733; color:#fff; padding:12px 16px; border-radius:8px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,.3); max-width:320px; white-space:pre-line; animation: slidein .2s; }
+  @keyframes slidein { from { transform: translateY(10px); opacity:0; } to { transform:none; opacity:1; } }
+
+  /* ====================== 登入畫面 ====================== */
+  .login-mask { position: fixed; inset: 0; background: linear-gradient(135deg,#1f2733,#2c3645); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; }
+  .login-mask.hide { display: none; }
+  .login-box { background: #fff; border-radius: 14px; padding: 32px; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .login-box .logo { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .login-box .sub { color: var(--text-soft); font-size: 13px; margin-bottom: 22px; }
+  .login-box .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+  .login-box .field label { font-size: 12px; color: var(--text-soft); }
+  .login-box .field input { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; }
+  .login-box .field input:focus { outline: none; border-color: var(--primary); }
+  .login-err { color: var(--red); font-size: 13px; min-height: 18px; margin-bottom: 6px; }
+  .login-hint { margin-top: 18px; font-size: 11px; color: var(--text-soft); background: #f4f5f7; padding: 10px 12px; border-radius: 8px; line-height: 1.7; }
+  .login-hint b { color: var(--text); }
+
+  /* ====================== RWD ====================== */
+  @media (max-width: 860px) {
+    .sidebar { position: fixed; left: -240px; z-index: 50; transition: left .2s; }
+    .sidebar.open { left: 0; }
+    .menu-toggle { display: inline-block; }
+    .content { padding: 16px; }
+  }
+  .page { display: none; }
+  .page.active { display: block; }
 </style>
 </head>
 <body>
-<div class="app">
-  <header>
-    <div class="brand">
-      <div class="logo">SPX</div>
-      <div><h1>SPX HD NETWORK CONTROL TOWER</h1>
-        <div class="sub">Network Operations Center · Taiwan</div></div>
+<div class="layout">
+  <!-- ====================== 左側 Sidebar ====================== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">供應商門市招募平台<small>Store Recruitment Console</small></div>
+    <nav class="nav" id="nav">
+      <button data-page="dashboard" class="active">🏠 Dashboard 首頁</button>
+      <button data-page="stores">🏬 門市招募列表</button>
+      <button data-page="mine">📋 我的招募</button>
+      <button data-page="review">⏳ 待審清單 <span class="badge" id="navReviewBadge">0</span></button>
+      <button data-page="history">🕘 歷史紀錄</button>
+      <button data-page="rules">📖 規則說明</button>
+    </nav>
+    <div class="role-box">
+      <label>目前登入</label>
+      <div id="userInfo" style="color:#fff;font-weight:600;margin:4px 0 10px;">—</div>
+      <button class="btn" style="width:100%" onclick="logout()">登出</button>
     </div>
-    <div class="kpibar" id="kpibar"></div>
-    <div class="clock">
-      <div class="t" id="clock">--:--:--</div>
-      <div class="d" id="date">--</div>
-      <div class="live"><span class="dot"></span> LIVE · <span id="dataSrc">Google Sheet</span></div>
-    </div>
-  </header>
-  <main>
-    <section class="panel">
-      <h2>◧ Map Layers</h2>
-      <div class="body">
-        <div id="layers"></div>
-        <div class="section-label">Filter · 縣市</div>
-        <select id="countyFilter"><option value="ALL">全台灣 (All Taiwan)</option></select>
-        <div class="legend" id="legend"></div>
-        <div class="section-label" style="margin-top:14px">Data</div>
-        <button class="btn" onclick="document.getElementById('csv').click()">⬆ 載入我的 CSV 資料</button>
-        <input type="file" id="csv" accept=".csv" style="display:none">
-        <button class="btn ghost" id="tplBtn">⬇ 下載 CSV 模板</button>
-        <button class="btn ghost" id="demoBtn">↺ 重新讀取 Google Sheet</button>
-        <div class="filehint">模板欄位：city, district, MP Normal Parcel Target(Q3'26), SCS Target(Q4'26), MP Orders 3PL, MP Orders 4PL, SCS Orders, 3PL Capacity, MP Potential Demand。依 city+district 對應地圖（臺/台 自動轉換）。</div>
-      </div>
-    </section>
-    <section class="panel">
-      <div class="mapwrap">
-        <div class="maptitle" id="mapTitle">Area Health Score <span>· 紅黃綠燈總覽</span></div>
-        <svg id="map"></svg>
-        <div class="maphint">滑鼠移入查看 · 點擊鎖定明細 · 灰色＝無資料/未上線 · 下方為全網路解答</div>
-        <div class="loading" id="loading"><div><div class="spinner"></div>載入台灣鄉鎮市區地圖中…<br><small>368 districts · g0v open data</small></div></div>
-      </div>
-    </section>
-    <section class="panel">
-      <h2 id="rightTitle">◉ Area Detail</h2>
-      <div class="body">
-        <div class="tabs">
-          <div class="tab active" data-tab="detail" id="tabDetail">明細</div>
-          <div class="tab" data-tab="watch" id="tabWatch">🔴 觀察清單</div>
+  </aside>
+
+  <!-- ====================== 主內容 ====================== -->
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
+      <h1 id="pageTitle">Dashboard 首頁</h1>
+      <div class="who">目前身份：<b id="whoLabel"></b></div>
+    </header>
+    <div class="content">
+
+      <!-- ============== 1. Dashboard ============== -->
+      <section class="page active" id="page-dashboard">
+        <div class="kpi-grid" id="kpiGrid"></div>
+        <div class="filters" id="filters-dashboard"></div>
+        <div class="card">
+          <div class="card-head">門市招募狀態總覽</div>
+          <div class="table-wrap"><table id="dashTable"></table></div>
         </div>
-        <div id="detailPane"><div class="empty">點擊地圖上的任一區域<br>查看 6 大 KPI 與健康分數。</div></div>
-        <div id="watchPane" style="display:none" class="watch"></div>
-      </div>
-    </section>
-  </main>
-  <footer id="footer"></footer>
+      </section>
+
+      <!-- ============== 2. 門市招募列表 ============== -->
+      <section class="page" id="page-stores">
+        <div class="filters" id="filters-stores"></div>
+        <div class="card">
+          <div class="card-head">門市招募列表</div>
+          <div class="table-wrap"><table id="storesTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== 3. 我的招募 ============== -->
+      <section class="page" id="page-mine">
+        <div class="card">
+          <div class="card-head">我的招募 <span id="mineSupplierName" style="color:var(--text-soft);font-weight:400;"></span></div>
+          <div class="table-wrap"><table id="mineTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== 4. 待審清單 (營運用) ============== -->
+      <section class="page" id="page-review">
+        <div class="tabs" id="reviewTabs"></div>
+        <div class="card">
+          <div class="card-head">待審 / 已處理申請</div>
+          <div class="table-wrap"><table id="reviewTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== 5. 歷史紀錄 ============== -->
+      <section class="page" id="page-history">
+        <div class="card">
+          <div class="card-head">歷史紀錄 (含供應商名稱，僅營運與紀錄可見)</div>
+          <div class="table-wrap"><table id="historyTable"></table></div>
+        </div>
+      </section>
+
+      <!-- ============== 6. 規則說明 ============== -->
+      <section class="page" id="page-rules">
+        <div class="card"><div class="card-head">規則說明</div>
+          <div class="rules" style="padding:18px 22px;" id="rulesBody"></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
 </div>
-<div class="tooltip" id="tip"></div>
+
+<!-- ====================== Modal ====================== -->
+<div class="modal-mask" id="modalMask">
+  <div class="modal">
+    <h3 id="modalTitle">標題</h3>
+    <div class="body" id="modalBody"></div>
+    <div class="foot">
+      <button class="btn" onclick="closeModal()">取消</button>
+      <button class="btn primary" id="modalSubmit">送出</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<!-- ====================== 登入畫面 ====================== -->
+<div class="login-mask" id="loginMask">
+  <div class="login-box">
+    <div class="logo">供應商門市招募平台</div>
+    <div class="sub">請輸入帳號密碼登入</div>
+    <div class="field"><label>帳號</label><input id="loginUser" placeholder="帳號" autocomplete="username"></div>
+    <div class="field"><label>密碼</label><input id="loginPass" type="password" placeholder="密碼" autocomplete="current-password"></div>
+    <div class="login-err" id="loginErr"></div>
+    <button class="btn primary" style="width:100%;padding:11px;" onclick="doLogin()">登入</button>
+    <div class="login-hint" id="loginHint"></div>
+  </div>
+</div>
 
 <script>
-/* ============================================================
-   SPX HD NETWORK CONTROL TOWER  ·  6-KPI model
-   ( formulas verified 707/708 vs uploaded Table.xlsx )
-   MP Orders = MP 3PL + MP 4PL ;  Total HD = MP Orders + SCS
-   KPI1 3PL Capacity-to-Demand   = 3PL Capacity / MP Potential Demand
-   KPI2 Potential Demand Coverage = MP 3PL Orders / MP Potential Demand
-   KPI3 4PL Dependency           = MP 4PL / (MP 3PL + MP 4PL)        target <=15%
-   KPI4 SPX HD Service Availability = (MP 3PL + MP 4PL) / MP Potential Demand
-   KPI5 MP Target-to-Demand      = MP 3PL Orders / Normal Parcel Target (Q3'26)
-   KPI6 SCS Target-to-Demand     = SCS Orders / SCS Target (Q4'26)
-   Health = 25*K4 + 20*K2 + 15*K1 + 15*K3inv + 15*K5 + 10*K6
-   Bands: >=90 green  70-89 yellow  <70 red
-   ============================================================ */
-const GEO_URL="https://cdn.jsdelivr.net/gh/g0v/twgeojson@master/json/twTown1982.geo.json";
-/* ╔════════════════════════════════════════════════════════════════════╗
-   ║  ▼▼▼  資料來源 — Google Sheet ▸ Apps Script API ▸ Dashboard  ▼▼▼     ║
-   ║                                                                      ║
-   ║  資料已不再寫死在程式裡，改為即時讀取 Google Sheet。                   ║
-   ║  要更新數字：直接編輯 Google Sheet 的「SPX_HD_data_template」分頁，    ║
-   ║  重新整理本頁面即可自動抓到最新資料。                                  ║
-   ║                                                                      ║
-   ║  ↓↓↓  唯一需要設定的地方：把你部署好的 Apps Script /exec 網址貼進來 ↓↓↓ ║
-   ╚════════════════════════════════════════════════════════════════════╝ */
-const API_URL = "https://script.google.com/macros/s/AKfycbz84RgAgTPSMF2RDKakQEORKjzaQfxxRMPONdd-E3GHJuMSt7Nm_5Ptb_zTq_RRqTve/exec";
+/* ============================================================================
+   區塊 1：常數定義（門市狀態 / 招募進度）
+   ============================================================================ */
 
-/* Apps Script doGet() 會回傳如下格式（欄位名稱已對應好，前端不需再轉換）：
-   { "updated":"...", "rows":261,
-     "data":[ {"city":"台北市","district":"松山區","mpTargetQ3":437,"scsTargetQ4":244,
-               "mp3":755,"mp4":0,"scs":118,"cap":708,"pot":801}, ... ] }            */
-
-const WEIGHTS={k4:0.25,k2:0.20,k1:0.15,k3:0.15,k5:0.15,k6:0.10};
-const FPL_TARGET=0.15;
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-const band=h=>h>=90?"green":h>=70?"yellow":"red";
-const COL={green:"#27d97f",yellow:"#ffc83d",red:"#ff4d62",grey:"#33425f"};
-const pct=v=>(v*100).toFixed(0)+"%";
-const num=v=>v>=1000?(v/1000).toFixed(v>=10000?0:1)+"k":Math.round(v);
-const norm=s=>(s||"").trim().replace(/臺/g,"台");
-
-function compute(d){
-  const mp3=+d.mp3||0, mp4=+d.mp4||0, scs=+d.scs||0, cap=+d.cap||0, pot=+d.pot||0;
-  const mpTgt=+d.mpTargetQ3||0, scsTgt=+d.scsTargetQ4||0;
-  const mpO=mp3+mp4, tot=mp3+mp4+scs;
-  const k1= pot? cap/pot:0;
-  const k2= pot? mp3/pot:0;
-  const k3= mpO? mp4/mpO:0;
-  const k4= pot? mpO/pot:0;
-  const k5= mpTgt? mp3/mpTgt:0;
-  const k6= scsTgt? scs/scsTgt:0;
-  const s1=clamp(k1,0,1)*100, s2=clamp(k2,0,1)*100, s4=clamp(k4,0,1)*100,
-        s5=clamp(k5,0,1)*100, s6=clamp(k6,0,1)*100;
-  const s3= k3<=FPL_TARGET?100:clamp(100-(k3-FPL_TARGET)*300,0,100);
-  const health=WEIGHTS.k1*s1+WEIGHTS.k2*s2+WEIGHTS.k3*s3+WEIGHTS.k4*s4+WEIGHTS.k5*s5+WEIGHTS.k6*s6;
-  return {...d,mp3,mp4,scs,cap,pot,mpTgt,scsTgt,mpO,tot,k1,k2,k3,k4,k5,k6,
-          s1,s2,s3,s4,s5,s6,health,growth:Math.max(0,1-k4)};
-}
-const hi=v=>v>=0.9?COL.green:v>=0.7?COL.yellow:COL.red;
-const LAYERS={
-  health:{name:"Area Health Score",sub:"紅黃綠燈總覽",icon:"🩺",desc:"6 KPI 加權",
-    val:d=>d.health,fmt:v=>v.toFixed(0),color:d=>COL[band(d.health)],
-    legend:[[COL.green,"🟢 健康 90–100"],[COL.yellow,"🟡 留意 70–89"],[COL.red,"🔴 風險 <70"],[COL.grey,"無資料 / 未上線"]]},
-  k1:{name:"KPI1 · Capacity-to-Demand",sub:"3PL 產能 / 潛在需求",icon:"⚙️",desc:"3PL Cap / Potential Demand",
-    val:d=>d.k1,fmt:pct,color:d=>d.k1>=1?COL.green:d.k1>=0.8?COL.yellow:COL.red,
-    legend:[[COL.green,"≥100% 產能足夠"],[COL.yellow,"80–100% 接近滿載"],[COL.red,"<80% 產能不足"],[COL.grey,"無資料"]]},
-  k2:{name:"KPI2 · Demand Coverage",sub:"覆蓋率",icon:"🎯",desc:"MP 3PL Orders / Potential Demand",
-    val:d=>d.k2,fmt:pct,color:d=>hi(d.k2),
-    legend:[[COL.green,"≥90% 覆蓋佳"],[COL.yellow,"70–90%"],[COL.red,"<70% 覆蓋不足"],[COL.grey,"無資料"]]},
-  k4:{name:"KPI4 · Service Availability",sub:"服務可用度",icon:"📡",desc:"MP(3PL+4PL) / Potential Demand",
-    val:d=>d.k4,fmt:pct,color:d=>hi(d.k4),
-    legend:[[COL.green,"≥90% 服務充分"],[COL.yellow,"70–90%"],[COL.red,"<70%"],[COL.grey,"無資料"]]},
-  k3:{name:"KPI3 · 4PL Dependency",sub:"4PL 依賴度",icon:"🔗",desc:"MP 4PL / MP Orders (≤15%)",
-    val:d=>d.k3,fmt:pct,color:d=>d.k3<=0.15?COL.green:d.k3<=0.30?COL.yellow:COL.red,
-    legend:[[COL.green,"≤15% 達標"],[COL.yellow,"15–30% 偏高"],[COL.red,">30% 過度依賴"],[COL.grey,"無資料"]]},
-  k5:{name:"KPI5 · MP Target Achv",sub:"MP 年底目標達成",icon:"📦",desc:"MP 3PL / Normal Parcel Target",
-    val:d=>d.k5,fmt:pct,color:d=>hi(d.k5),
-    legend:[[COL.green,"≥90% 接近/達標"],[COL.yellow,"70–90%"],[COL.red,"<70% 落後"],[COL.grey,"無資料"]]},
-  k6:{name:"KPI6 · SCS Target Achv",sub:"SCS 目標達成",icon:"🚚",desc:"SCS Orders / SCS Target",
-    val:d=>d.k6,fmt:pct,color:d=>hi(d.k6),
-    legend:[[COL.green,"≥90%"],[COL.yellow,"70–90%"],[COL.red,"<70% 落後"],[COL.grey,"無資料"]]}
+// 門市狀態定義
+const STORE_STATUS = {
+  urgent:   { label: '🔥 急徵',     cls: 'red',   desc: '隨時可開店，需優先招募' },
+  open:     { label: '🟢 開放招募', cls: 'green', desc: '約 1 週後可開店，可開始招募' },
+  planning: { label: '⚪ 規劃中',   cls: 'grey',  desc: '約 3–4 週後開店，可提前建立人才庫' },
+  filled:   { label: '✅ 已補齊',   cls: 'green', desc: '招募完成，停止開放' },
 };
 
-let DATA={}, FEATURES=[], COUNTIES=new Set(), curLayer="health", curCounty="ALL", selected=null;
-function loadData(arr){DATA={};arr.forEach(d=>{const c=compute(d);DATA[norm(d.city)+"|"+norm(d.district)]=c;});}
-function rec(f){return DATA[norm(f.properties.COUNTYNAME)+"|"+norm(f.properties.TOWNNAME)];}
-function isActive(r){return r && (r.mp3||r.mp4||r.scs||r.pot);}
+// 招募進度定義 (stage)
+const PROGRESS = {
+  not_started: { label: '🟢 尚未開始',     cls: 'green',  desc: '尚無供應商開始招募，所有供應商皆可申請' },
+  started:     { label: '🟡 已有供應商開始招募', cls: 'yellow', desc: '保留 7 天，逾期未更新名額自動釋出', reserveHours: 24*7 },
+  confirmed:   { label: '🟠 已有供應商確認人選', cls: 'orange', desc: '帳號已建立完成，保留 48 小時等待報到程序', reserveHours: 48 },
+  onboard:     { label: '🔵 已有供應商確認報到日期', cls: 'blue', desc: '暫時關閉新的招募申請；若報到取消則重新開放' },
+  completed:   { label: '✅ 招募完成',     cls: 'green',  desc: '已完成招募，停止開放' },
+};
 
-function buildLayers(){
-  const box=d3.select("#layers");
-  Object.entries(LAYERS).forEach(([k,L])=>{
-    box.append("div").attr("class","layerbtn"+(k===curLayer?" active":"")).on("click",()=>setLayer(k))
-      .html(`<div class="ttl"><span class="ic">${L.icon}</span>${L.name}</div><div class="ds">${L.sub} · ${L.desc}</div>`);
+// 申請動作 (action)
+const ACTION = {
+  apply:    '申請招募',
+  start:    '開始招募',
+  confirm:  '確認人選',
+  onboard:  '確認報到日期',
+  waitlist: '加入候補',
+  release:  '逾期釋出',
+  complete: '招募完成',
+};
+
+/* ============================================================================
+   區塊 2：模擬資料 (日後改由 Google Sheets 讀取)
+   TODO: 串接 — 把以下 array 改成 fetch(APPS_SCRIPT_URL) 取得的資料
+   ============================================================================ */
+
+// 城市 → 地區 對應（篩選連動用）
+const CITY_DISTRICTS = {
+  '台北市': ['信義區', '內湖區', '士林區'],
+  '新北市': ['板橋區', '新莊區', '三重區', '中和區'],
+  '桃園市': ['桃園區', '中壢區'],
+  '台中市': ['西屯區', '北屯區'],
+  '高雄市': ['前鎮區', '左營區'],
+};
+
+// 供應商（至少 5 家）
+let SUPPLIERS = ['宏運物流', '速達人力', '全聯運能', '台灣宅配通', '優選派遣'];
+
+// 帳號密碼（模擬 Google Sheet 的「帳號密碼」分頁）
+// TODO: 串接 — 改為從 Apps Script 讀取「帳號密碼」分頁，密碼建議在後端比對，不要明文放前端。
+//   分頁欄位建議：帳號 username | 密碼 password | 角色 role(supplier/ops) | 供應商 supplier | 顯示名稱 displayName
+let ACCOUNTS = [
+  { username:'hongyun', password:'1234',  role:'supplier', supplier:'宏運物流',   displayName:'宏運物流' },
+  { username:'suda',    password:'1234',  role:'supplier', supplier:'速達人力',   displayName:'速達人力' },
+  { username:'pxlogi',  password:'1234',  role:'supplier', supplier:'全聯運能',   displayName:'全聯運能' },
+  { username:'taiwan',  password:'1234',  role:'supplier', supplier:'台灣宅配通', displayName:'台灣宅配通' },
+  { username:'youxuan', password:'1234',  role:'supplier', supplier:'優選派遣',   displayName:'優選派遣' },
+  { username:'ops',     password:'admin', role:'ops',      supplier:'',           displayName:'營運人員 (Ops)' },
+];
+
+// Store_Master（至少 8 間門市）
+// stage = 招募進度 key；status = 門市狀態 key
+let stores = [
+  { id:'HD001', city:'新北市', district:'板橋區', name:'板橋新板', type:'HD', volume:1800, need:3, status:'urgent',   stage:'not_started', openDate:'2026/06/28', remark:'可立即開店' },
+  { id:'HD002', city:'台北市', district:'信義區', name:'信義松高', type:'HD', volume:2400, need:4, status:'urgent',   stage:'started',     openDate:'2026/06/29', remark:'貨量大，需優先' },
+  { id:'SD003', city:'台北市', district:'內湖區', name:'內湖科技', type:'SD', volume:1500, need:2, status:'open',     stage:'confirmed',   openDate:'2026/07/03', remark:'科技園區需求' },
+  { id:'HD004', city:'新北市', district:'新莊區', name:'新莊副都心', type:'HD', volume:2000, need:3, status:'open',   stage:'onboard',     openDate:'2026/07/05', remark:'已確認報到' },
+  { id:'SD005', city:'桃園市', district:'中壢區', name:'中壢站前', type:'SD', volume:1200, need:2, status:'planning', stage:'not_started', openDate:'2026/07/18', remark:'規劃中可建人才庫' },
+  { id:'HD006', city:'台中市', district:'西屯區', name:'台中逢甲', type:'HD', volume:2600, need:4, status:'urgent',   stage:'not_started', openDate:'2026/07/01', remark:'夜市商圈高量' },
+  { id:'SD007', city:'高雄市', district:'前鎮區', name:'高雄夢時代', type:'SD', volume:1700, need:3, status:'open',   stage:'started',     openDate:'2026/07/08', remark:'' },
+  { id:'HD008', city:'新北市', district:'三重區', name:'三重重新', type:'HD', volume:900,  need:1, status:'filled',   stage:'completed',   openDate:'2026/06/20', remark:'已補齊團隊' },
+  { id:'SD009', city:'桃園市', district:'桃園區', name:'桃園藝文', type:'SD', volume:1400, need:2, status:'planning', stage:'not_started', openDate:'2026/07/22', remark:'提前布局' },
+];
+
+// 進行中的招募關係 (recruitments)：每筆 = 一家供應商在某門市的招募狀態
+// stage: started / confirmed / onboard / completed / waitlist
+// 由「已核准」的申請產生。pendingAction = 目前正在等待營運審核的動作（無則 null）。
+let recruitments = [
+  // 信義松高：宏運物流 已開始招募（核准後 7 天保留），示範倒數
+  { id:'R1', supplier:'宏運物流', storeId:'HD002', stage:'started',   reserveUntil: tsFromNow(24*6),  candidateCount:0, onboardDate:'', pendingAction:null },
+  // 內湖科技：速達人力 已確認人選（48h 保留）
+  { id:'R2', supplier:'速達人力', storeId:'SD003', stage:'confirmed', reserveUntil: tsFromNow(40),    candidateCount:2, onboardDate:'', pendingAction:null },
+  // 新莊副都心：全聯運能 已確認報到日期
+  { id:'R3', supplier:'全聯運能', storeId:'HD004', stage:'onboard',   reserveUntil: null,             candidateCount:3, onboardDate:'2026/07/05', pendingAction:null },
+  // 高雄夢時代：台灣宅配通 開始招募，但已逾期（示範逾期釋出）
+  { id:'R4', supplier:'台灣宅配通', storeId:'SD007', stage:'started', reserveUntil: tsFromNow(-12),    candidateCount:0, onboardDate:'', pendingAction:null },
+  // 三重重新：宏運物流 招募完成
+  { id:'R5', supplier:'宏運物流', storeId:'HD008', stage:'completed', reserveUntil: null,             candidateCount:1, onboardDate:'2026/06/20', pendingAction:null },
+];
+
+// 待審 / 已處理申請 (applications)
+// status: pending / approved / rejected
+let applications = [
+  { id:'A1', time:'2026/06/24 10:12', supplier:'優選派遣', storeId:'HD002', action:'waitlist', status:'pending',
+    note:'欲加入候補，已有 5 名儲備人力', candidateCount:0, onboardDate:'', onboardTime:'', accountStatus:'', reviewer:'' },
+  { id:'A2', time:'2026/06/24 14:30', supplier:'速達人力', storeId:'SD003', action:'onboard', status:'pending',
+    note:'人選已完成帳號，安排 7/4 報到', candidateCount:2, onboardDate:'2026/07/04', onboardTime:'09:00', accountStatus:'已建立完成', reviewer:'' },
+];
+
+// 歷史紀錄 (history log)
+let history = [
+  { time:'2026/06/20 09:00', supplier:'宏運物流', storeId:'HD008', action:'complete', approved:'核准', reviewer:'Ops-Amy', note:'三重重新團隊補齊' },
+  { time:'2026/06/22 11:20', supplier:'全聯運能', storeId:'HD004', action:'onboard',  approved:'核准', reviewer:'Ops-Amy', note:'確認 7/5 報到' },
+  { time:'2026/06/23 16:05', supplier:'宏運物流', storeId:'HD002', action:'apply',    approved:'核准', reviewer:'Ops-Ben', note:'核准開始招募，保留 7 天' },
+];
+
+// 目前登入身份：null = 尚未登入；登入後為供應商名稱字串，或 'ops'
+let currentRole = null;           // 由登入決定
+let currentUser = null;           // 目前登入的帳號物件
+let reviewTab = 'all';            // 待審清單目前 tab
+let idSeq = 100;                  // 流水號產生器
+
+/* ============================================================================
+   區塊 3：工具函式
+   ============================================================================ */
+function tsFromNow(hours){ return Date.now() + hours*3600*1000; }
+function nextId(prefix){ return prefix + (++idSeq); }
+function getStore(id){ return stores.find(s => s.id === id); }
+function isOps(){ return currentRole === 'ops'; }
+function nowStr(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}/${p(d.getMonth()+1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// 計算某門市目前「進行中」的招募（非完成、非候補）家數
+function activeCount(storeId){
+  return recruitments.filter(r => r.storeId===storeId && ['started','confirmed','onboard'].includes(r.stage)).length;
+}
+// 候補家數（含 pending 候補申請 + recruitments 中 waitlist）
+function waitlistCount(storeId){
+  const pend = applications.filter(a => a.storeId===storeId && a.action==='waitlist' && a.status==='pending').length;
+  const appr = recruitments.filter(r => r.storeId===storeId && r.stage==='waitlist').length;
+  return pend + appr;
+}
+// 取得某門市對外顯示的進度標籤（含 X 家供應商 / 候補數，不顯示名稱）
+function progressLabel(store){
+  const p = PROGRESS[store.stage];
+  let txt = p.label;
+  const n = activeCount(store.id);
+  if (store.stage === 'started')    txt = `🟡 已有 ${n} 家供應商開始招募`;
+  if (store.stage === 'confirmed')  txt = `🟠 已有 ${n} 家供應商確認人選`;
+  if (store.stage === 'onboard')    txt = `🔵 已有供應商確認報到日期`;
+  const w = waitlistCount(store.id);
+  return { html:`<span class="tag ${p.cls}">${txt}</span>` + (w>0 ? ` <span class="tag grey">候補中：${w} 家</span>` : ''), cls:p.cls };
+}
+// 判斷某門市是否仍可「申請招募」
+function canApply(store){
+  if (['filled'].includes(store.status)) return false;
+  if (['onboard','completed'].includes(store.stage)) return false; // 報到 / 完成 後關閉
+  return true;
+}
+// 判斷是否可「加入候補」：已有人保留但尚未進入 onboard
+function canWaitlist(store){
+  return ['started','confirmed'].includes(store.stage);
+}
+// 倒數顯示 + 逾期判斷
+function reserveInfo(r){
+  if (!r || !r.reserveUntil) return { text:'—', expired:false };
+  const diff = r.reserveUntil - Date.now();
+  if (diff <= 0) return { text:'已逾期', expired:true };
+  const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000);
+  const d = Math.floor(h/24);
+  const text = d>0 ? `剩 ${d} 天 ${h%24} 小時` : `剩 ${h} 小時 ${m} 分`;
+  return { text, expired:false };
+}
+// 找出某供應商在某門市的招募關係
+function findRec(supplier, storeId){ return recruitments.find(r => r.supplier===supplier && r.storeId===storeId); }
+// 某供應商在某門市是否已有 pending 申請
+function hasPending(supplier, storeId){
+  return applications.some(a => a.supplier===supplier && a.storeId===storeId && a.status==='pending');
+}
+
+/* ============================================================================
+   區塊 4：SeaTalk 通知模擬
+   TODO: 串接 — 把 console.log 換成對 SeaTalk Webhook 的 fetch POST
+   範例：
+     fetch(SEATALK_WEBHOOK_URL, { method:'POST',
+       headers:{'Content-Type':'application/json'},
+       body: JSON.stringify({ text: message }) });
+   ============================================================================ */
+function sendSeaTalkNotification(message){
+  console.log('%c[SeaTalk 通知]\n' + message, 'color:#ee4d2d');
+  // 也可在此推播給 #ops 群組
+}
+
+/* ============================================================================
+   區塊 5：Toast 提示
+   ============================================================================ */
+function toast(msg){
+  const box = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = 'toast-item';
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+/* ============================================================================
+   區塊 6：導覽切換
+   ============================================================================ */
+const PAGE_TITLES = { dashboard:'Dashboard 首頁', stores:'門市招募列表', mine:'我的招募', review:'待審清單', history:'歷史紀錄', rules:'規則說明' };
+function gotoPage(page){
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.page===page));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.getElementById('pageTitle').textContent = PAGE_TITLES[page];
+  document.getElementById('sidebar').classList.remove('open');
+  renderAll();
+}
+document.getElementById('nav').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-page]');
+  if (btn) gotoPage(btn.dataset.page);
+});
+
+/* ============================================================================
+   區塊 7：篩選器（城市↔地區連動）
+   ============================================================================ */
+let filterState = { city:'', district:'', type:'', status:'', stage:'', q:'' };
+
+function buildFilters(containerId){
+  const c = document.getElementById(containerId);
+  c.innerHTML = `
+    <div class="field"><label>城市</label>
+      <select data-f="city"><option value="">全部城市</option>${Object.keys(CITY_DISTRICTS).map(x=>`<option ${filterState.city===x?'selected':''}>${x}</option>`).join('')}</select></div>
+    <div class="field"><label>地區</label>
+      <select data-f="district"><option value="">全部地區</option>${districtOptions()}</select></div>
+    <div class="field"><label>門市類型</label>
+      <select data-f="type"><option value="">全部類型</option><option ${filterState.type==='HD'?'selected':''}>HD</option><option ${filterState.type==='SD'?'selected':''}>SD</option></select></div>
+    <div class="field"><label>門市狀態</label>
+      <select data-f="status"><option value="">全部狀態</option>${Object.entries(STORE_STATUS).map(([k,v])=>`<option value="${k}" ${filterState.status===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
+    <div class="field"><label>招募進度</label>
+      <select data-f="stage"><option value="">全部進度</option>${Object.entries(PROGRESS).map(([k,v])=>`<option value="${k}" ${filterState.stage===k?'selected':''}>${v.label}</option>`).join('')}</select></div>
+    <div class="field"><label>搜尋門市名稱</label>
+      <input data-f="q" placeholder="輸入門市名稱…" value="${filterState.q}"></div>
+    <button class="btn reset" onclick="resetFilters()">清除篩選</button>
+  `;
+  c.querySelectorAll('[data-f]').forEach(el => {
+    const ev = el.tagName==='INPUT' ? 'input' : 'change';
+    el.addEventListener(ev, () => {
+      filterState[el.dataset.f] = el.value;
+      if (el.dataset.f==='city') filterState.district = ''; // 城市改變時清空地區
+      renderAll();
+    });
   });
 }
-function setLayer(k){curLayer=k;
-  d3.selectAll(".layerbtn").classed("active",(d,i)=>Object.keys(LAYERS)[i]===k);
-  d3.select("#mapTitle").html(`${LAYERS[k].name} <span>· ${LAYERS[k].sub}</span>`);
-  paint();buildLegend();}
-function buildLegend(){
-  const L=LAYERS[curLayer],box=d3.select("#legend").html("");
-  box.append("div").attr("class","section-label").text("Legend · 圖例");
-  L.legend.forEach(([c,t])=>{const r=box.append("div").attr("class","row");
-    r.append("div").attr("class","sw").style("background",c);r.append("div").text(t);});
+function districtOptions(){
+  const list = filterState.city ? CITY_DISTRICTS[filterState.city] : Object.values(CITY_DISTRICTS).flat();
+  return list.map(d=>`<option ${filterState.district===d?'selected':''}>${d}</option>`).join('');
+}
+function resetFilters(){ filterState = { city:'', district:'', type:'', status:'', stage:'', q:'' }; renderAll(); }
+function applyFilters(list){
+  return list.filter(s =>
+    (!filterState.city || s.city===filterState.city) &&
+    (!filterState.district || s.district===filterState.district) &&
+    (!filterState.type || s.type===filterState.type) &&
+    (!filterState.status || s.status===filterState.status) &&
+    (!filterState.stage || s.stage===filterState.stage) &&
+    (!filterState.q || s.name.includes(filterState.q))
+  );
 }
 
-const svg=d3.select("#map"),g=svg.append("g");let path,proj;
-function drawMap(geo){
-  FEATURES=geo.features;
-  FEATURES.forEach(f=>COUNTIES.add(norm(f.properties.COUNTYNAME)));
-  const cf=d3.select("#countyFilter");
-  [...COUNTIES].sort().forEach(c=>cf.append("option").attr("value",c).text(c));
-  cf.on("change",function(){curCounty=this.value;zoomCounty();paint();renderFooter();renderWatch();});
-  const w=svg.node().clientWidth,h=svg.node().clientHeight;
-  proj=d3.geoMercator().fitSize([w,h],geo);path=d3.geoPath(proj);
-  g.selectAll("path").data(FEATURES).join("path").attr("d",path)
-    .on("mousemove",showTip).on("mouseleave",hideTip).on("click",(e,d)=>selectArea(d));
-  paint();buildLegend();renderFooter();renderWatch();
-  d3.select("#loading").style("display","none");
-}
-function zoomCounty(){
-  const w=svg.node().clientWidth,h=svg.node().clientHeight;
-  const subset=curCounty==="ALL"?{type:"FeatureCollection",features:FEATURES}
-    :{type:"FeatureCollection",features:FEATURES.filter(f=>norm(f.properties.COUNTYNAME)===curCounty)};
-  if(!subset.features.length)return;
-  proj.fitSize([w*.95,h*.95],subset);path=d3.geoPath(proj);
-  g.selectAll("path").transition().duration(600).attr("d",path);
-}
-function paint(){
-  const L=LAYERS[curLayer];
-  g.selectAll("path").transition().duration(350).attr("fill",d=>{
-    if(curCounty!=="ALL"&&norm(d.properties.COUNTYNAME)!==curCounty)return"#0b1422";
-    const r=rec(d); if(!isActive(r))return COL.grey; return L.color(r);
-  }).attr("opacity",d=>(curCounty!=="ALL"&&norm(d.properties.COUNTYNAME)!==curCounty)?0.25:1);
-  renderKPI();
-}
-const tip=d3.select("#tip");
-function showTip(e,d){
-  const r=rec(d);
-  const head=`<h4>${d.properties.TOWNNAME}`;
-  if(!isActive(r)){tip.style("opacity",1).style("left",(e.clientX+16)+"px").style("top",(e.clientY+14)+"px")
-    .html(`${head}<span class="pill" style="background:${COL.grey};color:#fff">N/A</span></h4>
-      <div class="r"><span>${norm(d.properties.COUNTYNAME)}</span><b>無資料 / 未上線</b></div>`);return;}
-  const b=band(r.health);
-  tip.style("opacity",1).style("left",(e.clientX+16)+"px").style("top",(e.clientY+14)+"px")
-    .html(`${head}<span class="pill" style="background:${COL[b]}">${r.health.toFixed(0)}</span></h4>
-      <div class="r"><span>${norm(d.properties.COUNTYNAME)}</span><b></b></div>
-      <div class="r"><span>K1 產能/需求</span><b>${pct(r.k1)}</b></div>
-      <div class="r"><span>K2 覆蓋率</span><b>${pct(r.k2)}</b></div>
-      <div class="r"><span>K4 服務可用</span><b>${pct(r.k4)}</b></div>
-      <div class="r"><span>K3 4PL 依賴</span><b style="color:${r.k3<=.15?'var(--green)':'var(--red)'}">${pct(r.k3)}</b></div>
-      <div class="r"><span>K5 MP 達成</span><b>${pct(r.k5)}</b></div>
-      <div class="r"><span>K6 SCS 達成</span><b>${pct(r.k6)}</b></div>`);
-}
-function hideTip(){tip.style("opacity",0);}
-function selectArea(d){selected=norm(d.properties.COUNTYNAME)+"|"+norm(d.properties.TOWNNAME);
-  g.selectAll("path").classed("sel",p=>p===d);showTab("detail");renderDetail();}
-
-function ring(s){const b=band(s),c=COL[b],R=36,C=2*Math.PI*R,off=C*(1-s/100);
-  return `<svg class="scorering" viewBox="0 0 84 84"><circle cx="42" cy="42" r="${R}" fill="none" stroke="#1c2942" stroke-width="9"/>
-    <circle cx="42" cy="42" r="${R}" fill="none" stroke="${c}" stroke-width="9" stroke-linecap="round"
-    stroke-dasharray="${C}" stroke-dashoffset="${off}" transform="rotate(-90 42 42)"/>
-    <text x="42" y="46" text-anchor="middle" fill="#fff" font-size="22" font-weight="800">${s.toFixed(0)}</text>
-    <text x="42" y="60" text-anchor="middle" fill="${c}" font-size="9" font-weight="700">${b==='green'?'HEALTHY':b==='yellow'?'WATCH':'RISK'}</text></svg>`;}
-function mrow(q,fmt,score,tgt,col,ans){const c=col||COL[band(score)],w=Math.min(100,score);
-  return `<div class="metric"><div class="top"><span class="q">${q}</span><span class="v" style="color:${c}">${fmt}</span></div>
-    <div class="bar"><i style="width:${w}%;background:${c}"></i>${tgt!=null?`<span class="tgt" style="left:${tgt}%"></span>`:""}</div>
-    <div class="ans">${ans}</div></div>`;}
-function renderDetail(){
-  const pane=d3.select("#detailPane");
-  if(!selected||!DATA[selected]){pane.html('<div class="empty">點擊地圖上的任一區域<br>查看 6 大 KPI 與健康分數。</div>');return;}
-  const r=DATA[selected];
-  if(!isActive(r)){pane.html(`<div class="empty"><b style="color:var(--txt)">${r.district}</b> · ${r.city}<br><br>此區目前無訂單資料（未上線或非服務範圍）。</div>`);return;}
-  const b=band(r.health);
-  pane.html(`
-    <div class="scorebig">${ring(r.health)}
-      <div class="scoremeta"><div class="nm">${r.district}</div><div class="cty">${r.city}</div>
-      <span class="badge" style="background:${COL[b]}">${b==='green'?'🟢 健康':b==='yellow'?'🟡 需留意':'🔴 風險'}</span></div></div>
-    ${mrow('KPI1 · 產能/需求 (15%)',pct(r.k1),r.s1,null,r.k1>=1?COL.green:r.k1>=.8?COL.yellow:COL.red,`3PL Cap ${num(r.cap)} / 需求 ${num(r.pot)} ${r.k1>=1?'✅ 產能足':'⚠️ 產能吃緊'}`)}
-    ${mrow('KPI2 · 覆蓋率 (20%)',pct(r.k2),r.s2,null,null,`MP 3PL ${num(r.mp3)} / 潛在 ${num(r.pot)}，還有 <b style="color:var(--accent2)">${pct(r.growth)}</b> 成長空間`)}
-    ${mrow('KPI4 · 服務可用度 (25%)',pct(r.k4),r.s4,null,null,`MP(3PL+4PL) ${num(r.mpO)} / 潛在 ${num(r.pot)}`)}
-    ${mrow('KPI3 · 4PL 依賴 (15%)',pct(r.k3),r.s3,15,r.k3<=.15?COL.green:r.k3<=.3?COL.yellow:COL.red,r.k3<=.15?'✅ ≤15% 目標內':'⚠️ 超過 15% 目標 (4PL '+num(r.mp4)+' 單)')}
-    ${mrow('KPI5 · MP 年底目標 (15%)',pct(r.k5),r.s5,null,null,`MP 3PL ${num(r.mp3)} / 目標 ${num(r.mpTgt)} ${r.k5>=1?'✅ 達標':'未達標'}`)}
-    ${mrow('KPI6 · SCS 目標 (10%)',pct(r.k6),r.s6,null,null,`SCS ${num(r.scs)} / 目標 ${num(r.scsTgt)} ${r.k6>=1?'✅ 達標':'未達標'}`)}
-    <div style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px;font-size:10px;color:var(--muted);line-height:1.7">
-      Health = 25%·K4 + 20%·K2 + 15%·K1 + 15%·K3(反向) + 15%·K5 + 10%·K6<br>
-      分數 → K1 ${r.s1.toFixed(0)} · K2 ${r.s2.toFixed(0)} · K3 ${r.s3.toFixed(0)} · K4 ${r.s4.toFixed(0)} · K5 ${r.s5.toFixed(0)} · K6 ${r.s6.toFixed(0)}</div>`);
-}
-function renderWatch(){
-  const arr=Object.values(DATA).filter(d=>isActive(d)&&(curCounty==="ALL"||d.city===curCounty))
-    .sort((a,b)=>a.health-b.health).slice(0,45);
-  const pane=d3.select("#watchPane").html("");
-  pane.append("div").attr("class","section-label").style("margin-bottom","8px").text("最需要關注的區域（健康由低到高）");
-  arr.forEach(d=>{const b=band(d.health);
-    const row=pane.append("div").attr("class","wrow").on("click",()=>{
-      selected=d.city+"|"+d.district;
-      g.selectAll("path").classed("sel",p=>norm(p.properties.COUNTYNAME)+"|"+norm(p.properties.TOWNNAME)===selected);
-      showTab("detail");renderDetail();});
-    row.html(`<span class="wlight" style="background:${COL[b]};box-shadow:0 0 8px ${COL[b]}"></span>
-      <span class="wnm">${d.district}<br><small>${d.city} · 4PL ${pct(d.k3)} · 覆蓋 ${pct(d.k2)} · 產能 ${pct(d.k1)}</small></span>
-      <span class="wsc" style="color:${COL[b]}">${d.health.toFixed(0)}</span>`);});
-}
-function showTab(t){d3.selectAll(".tab").classed("active",false);
-  d3.select(t==="detail"?"#tabDetail":"#tabWatch").classed("active",true);
-  d3.select("#detailPane").style("display",t==="detail"?"block":"none");
-  d3.select("#watchPane").style("display",t==="watch"?"block":"none");}
-d3.select("#tabDetail").on("click",()=>showTab("detail"));
-d3.select("#tabWatch").on("click",()=>{showTab("watch");renderWatch();});
-
-function aggregate(){
-  // ratios sum over ALL planned areas in scope (matches sheet's Overall row: targets
-  // include not-yet-live areas); traffic-light counts use live areas only.
-  const scope=Object.values(DATA).filter(d=>curCounty==="ALL"||d.city===curCounty);
-  const live=scope.filter(isActive);
-  const S=f=>scope.reduce((a,d)=>a+f(d),0);
-  const mp3=S(d=>d.mp3),mp4=S(d=>d.mp4),scs=S(d=>d.scs),cap=S(d=>d.cap),pot=S(d=>d.pot),
-        mpT=S(d=>d.mpTgt),scsT=S(d=>d.scsTgt),mpO=mp3+mp4;
-  const g=live.filter(d=>band(d.health)==="green").length,
-        y=live.filter(d=>band(d.health)==="yellow").length,
-        rd=live.filter(d=>band(d.health)==="red").length;
-  return {n:live.length,total:scope.length,
-    k1:pot?cap/pot:0,k2:pot?mp3/pot:0,k3:mpO?mp4/mpO:0,k4:pot?mpO/pot:0,k5:mpT?mp3/mpT:0,k6:scsT?scs/scsT:0,
-    avgHealth:live.length?live.reduce((a,d)=>a+d.health,0)/live.length:0,g,y,rd,mp4,mpO,pot};
-}
+/* ============================================================================
+   區塊 8：渲染 — KPI
+   ============================================================================ */
 function renderKPI(){
-  const a=aggregate(),box=d3.select("#kpibar").html("");
-  const card=(l,v,c)=>box.append("div").attr("class","kpi").html(`<div class="lbl">${l}</div><div class="val" style="color:${c||'var(--txt)'}">${v}</div>`);
-  card("K1 Cap/Demand",pct(a.k1),a.k1>=1?"var(--green)":a.k1>=.8?"var(--yellow)":"var(--red)");
-  card("K2 Coverage",pct(a.k2),a.k2>=.9?"var(--green)":a.k2>=.7?"var(--yellow)":"var(--red)");
-  card("K4 Service Avl",pct(a.k4),a.k4>=.9?"var(--green)":a.k4>=.7?"var(--yellow)":"var(--red)");
-  card("K3 4PL Dep",pct(a.k3),a.k3<=.15?"var(--green)":a.k3<=.3?"var(--yellow)":"var(--red)");
-  card("K5 MP Target",pct(a.k5),a.k5>=.9?"var(--green)":a.k5>=.7?"var(--yellow)":"var(--red)");
-  card("K6 SCS Target",pct(a.k6),a.k6>=.9?"var(--green)":a.k6>=.7?"var(--yellow)":"var(--red)");
-  card("Avg Health",a.avgHealth.toFixed(0),COL[band(a.avgHealth)]);
-  box.append("div").attr("class","kpi").html(`<div class="lbl">Areas 🟢🟡🔴</div>
-    <div class="val" style="font-size:15px"><span style="color:var(--green)">${a.g}</span> <span style="color:var(--yellow)">${a.y}</span> <span style="color:var(--red)">${a.rd}</span><small>/${a.n}</small></div>`);
-}
-function renderFooter(){
-  const a=aggregate(),f=d3.select("#footer").html(""),scope=curCounty==="ALL"?"全台灣":curCounty;
-  const Q=(h,v,col,fo,ans)=>f.append("div").attr("class","qcard")
-    .html(`<div class="qh">${h} · ${scope}</div><div class="qv" style="color:${col}">${v}</div><div class="qf">${fo}</div><div class="qa">${ans}</div>`);
-  Q("KPI1 產能夠嗎？",pct(a.k1),a.k1>=1?"var(--green)":a.k1>=.8?"var(--yellow)":"var(--red)","3PL Cap / Potential Demand",a.k1>=1?"✅ 產能足夠":`產能僅及需求 ${pct(a.k1)}`);
-  Q("KPI2 還有成長空間？",pct(a.k2),a.k2>=.9?"var(--green)":a.k2>=.7?"var(--yellow)":"var(--red)","MP 3PL Orders / Potential",`還有 ${pct(Math.max(0,1-a.k2))} 覆蓋空間`);
-  Q("KPI4 服務可用度",pct(a.k4),a.k4>=.9?"var(--green)":a.k4>=.7?"var(--yellow)":"var(--red)","MP(3PL+4PL) / Potential",`滿足潛在需求的 ${pct(a.k4)}`);
-  Q("KPI3 太依賴 4PL？",pct(a.k3),a.k3<=.15?"var(--green)":"var(--red)","MP 4PL / MP Orders (≤15%)",a.k3<=.15?"✅ 目標內":`⚠️ 超標 ${pct(a.k3-.15)}`);
-  Q("KPI5 MP 年底達標？",pct(a.k5),a.k5>=.9?"var(--green)":a.k5>=.7?"var(--yellow)":"var(--red)","MP 3PL / Normal Parcel Target",a.k5>=1?"✅ 已達標":`差 ${pct(Math.max(0,1-a.k5))}`);
-  Q("KPI6 SCS 目標？",pct(a.k6),a.k6>=.9?"var(--green)":a.k6>=.7?"var(--yellow)":"var(--red)","SCS Orders / SCS Target",a.k6>=1?"✅ 已達標":`差 ${pct(Math.max(0,1-a.k6))}`);
-  Q("總體健康",a.avgHealth.toFixed(0),COL[band(a.avgHealth)],"6 KPI 加權 (0–100)",`🟢${a.g} 🟡${a.y} 🔴${a.rd} / ${a.n} 區`);
+  const urgent = stores.filter(s=>s.status==='urgent').length;
+  const open   = stores.filter(s=>s.status==='open').length;
+  const plan   = stores.filter(s=>s.status==='planning').length;
+  const volume = stores.reduce((a,s)=>a+s.volume,0);
+  const need   = stores.reduce((a,s)=>a+s.need,0);
+  const pend   = applications.filter(a=>a.status==='pending').length;
+  const cards = [
+    {l:'🔥 急徵門市數', v:urgent}, {l:'🟢 開放招募門市數', v:open}, {l:'⚪ 規劃中門市數', v:plan},
+    {l:'📦 預估總貨量', v:volume.toLocaleString()}, {l:'👥 總需求人數', v:need},
+    {l:'⏳ 待審申請數', v:pend, accent:true},
+  ];
+  document.getElementById('kpiGrid').innerHTML = cards.map(c=>
+    `<div class="kpi ${c.accent?'accent':''}"><div class="label">${c.l}</div><div class="value">${c.v}</div></div>`).join('');
 }
 
-function downloadTemplate(){
-  const hdr=["city","district","MP Normal Parcel Target (Q3'26)","SCS Target (Q4'26)","MP Orders 3PL","MP Orders 4PL","SCS Orders","3PL Capacity","MP Potential Demand"];
-  const rows=Object.values(DATA).map(d=>[d.city,d.district,d.mpTgt,d.scsTgt,d.mp3,d.mp4,d.scs,d.cap,d.pot]);
-  const csv="﻿"+[hdr.join(","),...rows.map(r=>r.join(","))].join("\n");
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-  a.download="SPX_HD_data_template.csv";a.click();
+/* ============================================================================
+   區塊 9：渲染 — 門市表格（Dashboard & 門市列表共用）
+   ============================================================================ */
+function storeRowActions(store){
+  // 營運：可確認完成 / 釋出逾期
+  if (isOps()){
+    let btns = '';
+    if (store.stage !== 'completed' && store.status !== 'filled')
+      btns += `<button class="btn success sm" onclick="opsComplete('${store.id}')">確認完成</button>`;
+    // 是否有逾期保留
+    const expired = recruitments.find(r=>r.storeId===store.id && reserveInfo(r).expired && ['started','confirmed'].includes(r.stage));
+    if (expired)
+      btns += `<button class="btn danger sm" onclick="opsRelease('${expired.id}')">釋出逾期名額</button>`;
+    return btns || '<span style="color:var(--text-soft)">—</span>';
+  }
+  // 供應商視角
+  const rec = findRec(currentRole, store.id);
+  if (rec && rec.stage!=='waitlist'){
+    return `<button class="btn sm" onclick="gotoPage('mine')">前往我的招募</button>`;
+  }
+  if (hasPending(currentRole, store.id)){
+    return `<span class="tag grey">等待審核</span>`;
+  }
+  let btns = '';
+  if (canApply(store)) btns += `<button class="btn primary sm" onclick="openApply('${store.id}')">申請招募</button>`;
+  if (canWaitlist(store)) btns += `<button class="btn sm" onclick="openWaitlist('${store.id}')">加入候補</button>`;
+  return btns || '<span style="color:var(--text-soft)">已關閉</span>';
 }
-function parseCSV(text){
-  const lines=text.replace(/^﻿/,"").split(/\r?\n/).filter(l=>l.trim());
-  const hdr=lines[0].split(",").map(s=>s.trim().toLowerCase());
-  const find=arr=>{for(const n of arr){const i=hdr.findIndex(h=>h.includes(n));if(i>=0)return i;}return -1;};
-  const ci={city:find(["city","縣市"]),dist:find(["district","區"]),mt:find(["normal parcel","mp normal","mp target"]),
-    st:find(["scs target"]),m3:find(["3pl orders","mp orders 3pl","orders 3pl"]),m4:find(["4pl orders","mp orders 4pl","orders 4pl"]),
-    so:find(["scs orders"]),cap:find(["3pl capacity","capacity"]),pot:find(["potential"])};
-  const arr=[];let ok=0;
-  for(let i=1;i<lines.length;i++){const c=lines[i].split(",");const dist=(c[ci.dist]||"").trim();if(!dist)continue;
-    arr.push({city:(c[ci.city]||"").trim(),district:dist,mpTargetQ3:+c[ci.mt]||0,scsTargetQ4:+c[ci.st]||0,
-      mp3:+c[ci.m3]||0,mp4:+c[ci.m4]||0,scs:+c[ci.so]||0,cap:+c[ci.cap]||0,pot:+c[ci.pot]||0});ok++;}
-  loadData(arr);d3.select("#dataSrc").text("我的 CSV ("+ok+" 區)");
-  zoomCounty();paint();renderFooter();renderWatch();renderDetail();
-  alert("已載入 "+ok+" 區資料，依 city+district 對應地圖。");
-}
-d3.select("#csv").on("change",function(){const f=this.files[0];if(!f)return;
-  const r=new FileReader();r.onload=e=>parseCSV(e.target.result);r.readAsText(f);});
-d3.select("#tplBtn").on("click",downloadTemplate);
-d3.select("#demoBtn").on("click",()=>{
-  d3.select("#dataSrc").text("讀取中…");
-  fetchSheet().then(rows=>{loadData(rows);d3.select("#dataSrc").text("Google Sheet · "+rows.length+" 區");
-    paint();renderFooter();renderWatch();renderDetail();})
-    .catch(err=>{d3.select("#dataSrc").text("讀取失敗");alert("重新讀取 Google Sheet 失敗：\n"+err);});});
 
-function tick(){const d=new Date();d3.select("#clock").text(d.toLocaleTimeString("en-GB"));
-  d3.select("#date").text(d.toLocaleDateString("zh-TW",{year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}));}
-setInterval(tick,1000);tick();
-
-buildLayers();
-
-// 從 Apps Script API 讀取 Google Sheet 資料，回傳已對應好欄位的陣列
-function fetchSheet(){
-  return fetch(API_URL,{cache:"no-store"})
-    .then(r=>{if(!r.ok)throw new Error("API HTTP "+r.status);return r.json();})
-    .then(j=>{const rows=Array.isArray(j)?j:(j.data||j.rows||[]);
-      if(!rows||!rows.length)throw new Error("Google Sheet 回傳 0 筆資料");return rows;});
+function renderStoreTable(tableId){
+  // 依門市狀態排序：🔥 急徵 → 🟢 開放招募 → ⚪ 規劃中 → ✅ 已補齊
+  const STATUS_ORDER = { urgent:0, open:1, planning:2, filled:3 };
+  const rows = applyFilters(stores).slice().sort((a,b)=> (STATUS_ORDER[a.status]??9) - (STATUS_ORDER[b.status]??9));
+  const head = `<thead><tr>
+    <th>門市</th><th>城市</th><th>地區</th><th>類型</th><th>預估貨量</th><th>需求人數</th>
+    <th>門市狀態</th><th>招募進度</th><th>預計開店日</th><th>操作</th></tr></thead>`;
+  const body = rows.length ? rows.map(s=>{
+    const st = STORE_STATUS[s.status];
+    return `<tr>
+      <td><b>${s.name}</b><br><span style="color:var(--text-soft);font-size:11px">${s.id}</span></td>
+      <td>${s.city}</td><td>${s.district}</td><td>${s.type}</td>
+      <td>${s.volume.toLocaleString()}</td><td>${s.need}</td>
+      <td><span class="tag ${st.cls}">${st.label}</span></td>
+      <td>${progressLabel(s).html}</td>
+      <td>${s.openDate}</td>
+      <td><div class="btn-group">${storeRowActions(s)}</div></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="10" class="empty">沒有符合條件的門市</td></tr>`;
+  document.getElementById(tableId).innerHTML = head + `<tbody>${body}</tbody>`;
 }
-function showLoadError(err){
-  d3.select("#loading").style("display","grid").html(`<div style="color:var(--red);max-width:390px;line-height:1.8;text-align:center">
-    ⚠️ 資料載入失敗
-    <br><br><small style="color:var(--muted);text-align:left;display:inline-block">請依序確認：<br>
-    ① 已部署 Apps Script，並把 <b>/exec</b> 網址貼到程式最上方的 <b>API_URL</b><br>
-    ② Apps Script 部署權限設為「擁有存取權的使用者：<b>任何人 Anyone</b>」<br>
-    ③ 試算表分頁名稱為 <b>SPX_HD_data_template</b><br>
-    ④ 網路可連到 <b>script.google.com</b> 與 <b>cdn.jsdelivr.net</b></small>
-    <br><br><span style="font-size:11px">錯誤訊息：</span><br><small style="color:var(--red)">${err}</small>
-    <br><br><button class="btn" style="max-width:170px;margin:6px auto 0" onclick="location.reload()">↻ 重新嘗試</button></div>`);
+
+/* ============================================================================
+   區塊 10：渲染 — 我的招募
+   ============================================================================ */
+const STAGE_ORDER = ['applied','started','confirmed','onboard','completed'];
+const STAGE_LABEL = { applied:'申請招募', started:'開始招募', confirmed:'確認人選', onboard:'確認報到日期', completed:'招募完成' };
+
+function stepper(currentStage){
+  // currentStage 為 recruitment.stage；applied 視為 started 之前
+  const idx = STAGE_ORDER.indexOf(currentStage==='waitlist' ? 'applied' : currentStage);
+  return '<div class="stepper">' + STAGE_ORDER.map((s,i)=>{
+    let cls = i<idx ? 'done' : (i===idx ? 'now' : '');
+    return `<span class="step ${cls}">${i+1} ${STAGE_LABEL[s]}</span>` + (i<STAGE_ORDER.length-1?'<span class="arrow">→</span>':'');
+  }).join('') + '</div>';
 }
-// 同時載入地圖底圖與 Google Sheet 資料，兩者皆完成才繪製
-d3.select("#loading").style("display","grid")
-  .html(`<div><div class="spinner"></div>讀取 Google Sheet 即時資料中…<br><small>SPX_HD_data_template</small></div>`);
-Promise.all([ d3.json(GEO_URL), fetchSheet() ])
-  .then(([geo,rows])=>{
-    loadData(rows);
-    d3.select("#dataSrc").text("Google Sheet · "+rows.length+" 區");
-    drawMap(geo);
-  })
-  .catch(err=>showLoadError(err));
-window.addEventListener("resize",()=>{if(path)zoomCounty();});
+
+function mineNextAction(rec, store){
+  if (rec.pendingAction){
+    return `<span class="tag grey">⏳ 待審：${ACTION[rec.pendingAction]}</span>`;
+  }
+  const info = reserveInfo(rec);
+  switch(rec.stage){
+    case 'waitlist':
+      return `<span class="tag grey">候補中，等待釋出</span>`;
+    case 'started':
+      return `<button class="btn primary sm" onclick="openConfirm('${rec.id}')">確認人選</button>`
+        + (info.expired ? ` <span class="tag expired">已逾期，待營運處理</span>` : '');
+    case 'confirmed':
+      return `<button class="btn primary sm" onclick="openOnboard('${rec.id}')">回報報到日期</button>`
+        + (info.expired ? ` <span class="tag expired">已逾期，待營運處理</span>` : '');
+    case 'onboard':
+      return `<span class="tag blue">等待營運確認完成</span>`;
+    case 'completed':
+      return `<span class="tag green">✅ 已完成</span>`;
+  }
+  return '—';
+}
+
+function renderMine(){
+  document.getElementById('mineSupplierName').textContent = isOps() ? '（營運身份：顯示所有供應商招募）' : '（' + currentRole + '）';
+  // 供應商：自己的；營運：全部
+  let recs = recruitments.filter(r => isOps() ? true : r.supplier===currentRole);
+  // 也納入「尚在待審、還沒成立 recruitment」的申請（例如剛申請招募）
+  const pendingApplies = applications.filter(a => a.status==='pending'
+      && (isOps() || a.supplier===currentRole)
+      && !findRec(a.supplier, a.storeId));
+  const head = `<thead><tr><th>門市</th><th>城市</th><th>地區</th>${isOps()?'<th>供應商</th>':''}<th>我的狀態 / 流程</th><th>保留截止</th><th>下一步操作</th></tr></thead>`;
+  let rowsHtml = '';
+  recs.forEach(r=>{
+    const s = getStore(r.storeId); if(!s) return;
+    const info = reserveInfo(r);
+    rowsHtml += `<tr>
+      <td><b>${s.name}</b><br><span style="color:var(--text-soft);font-size:11px">${s.id}</span></td>
+      <td>${s.city}</td><td>${s.district}</td>
+      ${isOps()?`<td>${r.supplier}</td>`:''}
+      <td>${stepper(r.stage)}</td>
+      <td>${ r.reserveUntil ? `${info.text}` : '—' }</td>
+      <td>${mineNextAction(r, s)}</td>
+    </tr>`;
+  });
+  pendingApplies.forEach(a=>{
+    const s = getStore(a.storeId); if(!s) return;
+    rowsHtml += `<tr>
+      <td><b>${s.name}</b><br><span style="color:var(--text-soft);font-size:11px">${s.id}</span></td>
+      <td>${s.city}</td><td>${s.district}</td>
+      ${isOps()?`<td>${a.supplier}</td>`:''}
+      <td>${stepper('applied')}</td>
+      <td>—</td>
+      <td><span class="tag grey">⏳ 等待審核：${ACTION[a.action]}</span></td>
+    </tr>`;
+  });
+  if (!rowsHtml) rowsHtml = `<tr><td colspan="${isOps()?7:6}" class="empty">目前沒有招募紀錄，請至「門市招募列表」申請。</td></tr>`;
+  document.getElementById('mineTable').innerHTML = head + `<tbody>${rowsHtml}</tbody>`;
+}
+
+/* ============================================================================
+   區塊 11：渲染 — 待審清單（營運）
+   ============================================================================ */
+const REVIEW_TABS = [
+  { k:'all', l:'全部' }, { k:'apply', l:'申請招募' }, { k:'start', l:'開始招募' },
+  { k:'confirm', l:'確認人選' }, { k:'onboard', l:'確認報到日期' }, { k:'waitlist', l:'候補' }, { k:'release', l:'逾期釋出' },
+];
+function renderReviewTabs(){
+  const pend = applications.filter(a=>a.status==='pending');
+  document.getElementById('reviewTabs').innerHTML = REVIEW_TABS.map(t=>{
+    const cnt = t.k==='all' ? pend.length : pend.filter(a=>a.action===t.k).length;
+    return `<button class="${reviewTab===t.k?'active':''}" onclick="reviewTab='${t.k}';renderAll()">${t.l} <span class="cnt">(${cnt})</span></button>`;
+  }).join('');
+}
+function renderReview(){
+  if (!isOps()){
+    document.getElementById('reviewTable').innerHTML = `<tbody><tr><td class="empty">此分頁僅供營運人員使用，請於左下角切換為「營運人員」身份。</td></tr></tbody>`;
+    return;
+  }
+  let list = applications.filter(a => reviewTab==='all' ? true : a.action===reviewTab);
+  // 待審優先排序
+  list = list.slice().sort((a,b)=> (a.status==='pending'?0:1) - (b.status==='pending'?0:1));
+  const head = `<thead><tr><th>申請時間</th><th>供應商</th><th>Store ID</th><th>門市</th><th>申請動作</th><th>備註</th><th>狀態</th><th>操作</th></tr></thead>`;
+  const body = list.length ? list.map(a=>{
+    const s = getStore(a.storeId);
+    const statusTag = a.status==='pending' ? '<span class="tag yellow">待審</span>'
+      : a.status==='approved' ? '<span class="tag green">已核准</span>' : '<span class="tag red">已拒絕</span>';
+    const ops = a.status==='pending'
+      ? `<div class="btn-group"><button class="btn success sm" onclick="approve('${a.id}')">核准</button>
+         <button class="btn danger sm" onclick="reject('${a.id}')">拒絕</button></div>`
+      : `<span style="color:var(--text-soft)">${a.reviewer||''}</span>`;
+    return `<tr>
+      <td>${a.time}</td><td><b>${a.supplier}</b></td><td>${a.storeId}</td><td>${s?s.name:'-'}</td>
+      <td><span class="tag blue">${ACTION[a.action]}</span></td>
+      <td class="note-cell">${a.note||'—'}${a.candidateCount?`<br>人選數：${a.candidateCount}`:''}${a.onboardDate?`<br>報到：${a.onboardDate} ${a.onboardTime||''}`:''}</td>
+      <td>${statusTag}</td><td>${ops}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="8" class="empty">此分類目前沒有申請</td></tr>`;
+  document.getElementById('reviewTable').innerHTML = head + `<tbody>${body}</tbody>`;
+}
+
+/* ============================================================================
+   區塊 12：渲染 — 歷史紀錄
+   ============================================================================ */
+function renderHistory(){
+  const head = `<thead><tr><th>時間</th><th>供應商</th><th>Store ID</th><th>門市</th><th>動作</th><th>核准狀態</th><th>核准人</th><th>備註</th></tr></thead>`;
+  const list = history.slice().reverse();
+  const body = list.length ? list.map(h=>{
+    const s = getStore(h.storeId);
+    const cls = h.approved==='核准' ? 'green' : h.approved==='拒絕' ? 'red' : 'grey';
+    return `<tr><td>${h.time}</td><td>${h.supplier}</td><td>${h.storeId}</td><td>${s?s.name:'-'}</td>
+      <td><span class="tag blue">${ACTION[h.action]||h.action}</span></td>
+      <td><span class="tag ${cls}">${h.approved}</span></td><td>${h.reviewer}</td><td class="note-cell">${h.note||'—'}</td></tr>`;
+  }).join('') : `<tr><td colspan="8" class="empty">尚無歷史紀錄</td></tr>`;
+  document.getElementById('historyTable').innerHTML = head + `<tbody>${body}</tbody>`;
+}
+function logHistory(supplier, storeId, action, approved, note){
+  history.push({ time: nowStr(), supplier, storeId, action, approved, reviewer: 'Ops', note: note||'' });
+}
+
+/* ============================================================================
+   區塊 13：渲染 — 規則說明
+   ============================================================================ */
+function renderRules(){
+  const statusRules = Object.values(STORE_STATUS).map(v=>`<div class="rule-item"><span class="tag ${v.cls}">${v.label}</span><div>${v.desc}</div></div>`).join('');
+  const progressRules = Object.values(PROGRESS).map(v=>`<div class="rule-item"><span class="tag ${v.cls}">${v.label}</span><div>${v.desc}</div></div>`).join('');
+  document.getElementById('rulesBody').innerHTML = `
+    <h2>一、門市狀態定義</h2>${statusRules}
+    <h2>二、招募進度定義</h2>${progressRules}
+    <h2>三、招募流程</h2>
+    <p>① 申請招募 → ② 開始招募 → ③ 確認人選（帳號已建立完成）→ ④ 確認報到日期 → ⑤ 招募完成（營運確認）</p>
+    <p>每次進度更新都會進入「待審」，營運核准後才會正式更新公開狀態。</p>
+    <h2>四、逾期釋出規則</h2>
+    <ul>
+      <li>🟡 開始招募：核准後保留 <b>7 天</b>，若未更新為「確認人選」則逾期，營運可手動釋出。</li>
+      <li>🟠 確認人選：核准後保留 <b>48 小時</b>，若未更新「報到日期」則逾期，營運可手動釋出。</li>
+      <li>釋出後 Dashboard 回到 🟢 尚未開始；若有候補，依申請順序由下一位候補取得機會。</li>
+    </ul>
+    <h2>五、候補機制</h2>
+    <p>門市已有供應商保留但尚未進入 🔵 確認報到日期前，其他供應商仍可「加入候補」。對外只顯示候補家數（例如「候補中：2 家供應商」），不顯示供應商名稱。</p>
+    <h2>六、隱私原則</h2>
+    <p>對外 Dashboard 只顯示「X 家供應商」，<b>不顯示供應商名稱</b>。供應商名稱僅在「待審清單」與「歷史紀錄」中對營運可見。</p>
+  `;
+}
+
+/* ============================================================================
+   區塊 14：Modal 控制
+   ============================================================================ */
+let modalSubmitHandler = null;
+function openModal(title, bodyHtml, onSubmit, submitText){
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalSubmit').textContent = submitText || '送出';
+  modalSubmitHandler = onSubmit;
+  document.getElementById('modalMask').classList.add('show');
+}
+function closeModal(){ document.getElementById('modalMask').classList.remove('show'); modalSubmitHandler=null; }
+document.getElementById('modalSubmit').addEventListener('click', ()=>{ if(modalSubmitHandler) modalSubmitHandler(); });
+document.getElementById('modalMask').addEventListener('click', e=>{ if(e.target.id==='modalMask') closeModal(); });
+
+// 供應商名稱欄位：綁定目前登入身份，唯讀不可改（身份由登入決定）。
+function supplierField(){ return `<input value="${currentRole||''}" readonly>`; }
+
+/* ---- 申請招募 ---- */
+function openApply(storeId){
+  const s = getStore(storeId);
+  openModal('申請招募', `
+    <div class="field"><label>供應商名稱</label>${supplierField()}</div>
+    <div class="field"><label>門市名稱</label><input value="${s.name}（${s.id}）" readonly></div>
+    <div class="field"><label>申請動作</label><input value="申請招募" readonly></div>
+    <div class="field"><label>備註 / 招募計畫</label><textarea id="m_note" rows="3" placeholder="例如：已有 3 名儲備人力，預計一週內到位"></textarea></div>
+    <div class="hint">送出後將新增一筆待審申請，營運會收到 SeaTalk 通知。</div>
+  `, ()=> submitApplication(storeId, 'apply'));
+}
+/* ---- 加入候補 ---- */
+function openWaitlist(storeId){
+  const s = getStore(storeId);
+  openModal('加入候補', `
+    <div class="field"><label>供應商名稱</label>${supplierField()}</div>
+    <div class="field"><label>門市名稱</label><input value="${s.name}（${s.id}）" readonly></div>
+    <div class="field"><label>申請動作</label><input value="加入候補" readonly></div>
+    <div class="field"><label>備註</label><textarea id="m_note" rows="3" placeholder="若目前保留逾期或被拒絕，將依申請順序取得機會"></textarea></div>
+    <div class="hint">此門市已有供應商保留，您可加入候補。送出後進入待審。</div>
+  `, ()=> submitApplication(storeId, 'waitlist'));
+}
+/* ---- 確認人選 ---- */
+function openConfirm(recId){
+  const r = recruitments.find(x=>x.id===recId); const s = getStore(r.storeId);
+  openModal('確認人選（帳號已建立完成）', `
+    <div class="field"><label>供應商名稱</label><input value="${r.supplier}" readonly></div>
+    <div class="field"><label>門市</label><input value="${s.name}（${s.id}）" readonly></div>
+    <div class="field"><label>人選數量</label><input id="m_count" type="number" min="1" value="${s.need}"></div>
+    <div class="field"><label>帳號建立狀態</label><input value="已建立完成" readonly></div>
+    <div class="field"><label>備註</label><textarea id="m_note" rows="2"></textarea></div>
+    <div class="hint">送出後進入待審，營運核准後 Dashboard 顯示「🟠 已有 X 家供應商確認人選」，保留 48 小時。</div>
+  `, ()=> submitReport(recId, 'confirm'));
+}
+/* ---- 回報報到日期 ---- */
+function openOnboard(recId){
+  const r = recruitments.find(x=>x.id===recId); const s = getStore(r.storeId);
+  openModal('回報報到日期', `
+    <div class="field"><label>供應商名稱</label><input value="${r.supplier}" readonly></div>
+    <div class="field"><label>門市</label><input value="${s.name}（${s.id}）" readonly></div>
+    <div class="field"><label>報到日期</label><input id="m_date" type="date"></div>
+    <div class="field"><label>報到時間</label><input id="m_time" type="time" value="09:00"></div>
+    <div class="field"><label>備註</label><textarea id="m_note" rows="2"></textarea></div>
+    <div class="hint">送出後進入待審，營運核准後 Dashboard 顯示「🔵 已有供應商確認報到日期」，此門市暫時關閉新申請。</div>
+  `, ()=> submitReport(recId, 'onboard'));
+}
+
+/* ============================================================================
+   區塊 15：供應商送出 — 新申請 / 進度回報
+   ============================================================================ */
+function submitApplication(storeId, action){
+  // 供應商名稱一律取自登入身份，前端無法竄改
+  const supplier = isOps() ? '' : currentRole;
+  if (!supplier){ alert('請以供應商身份登入後再申請。'); return; }
+  const note = document.getElementById('m_note')?.value || '';
+  if (hasPending(supplier, storeId)){ alert('此門市已有一筆待審申請，請等待營運處理。'); return; }
+  applications.push({ id: nextId('A'), time: nowStr(), supplier, storeId, action, status:'pending',
+    note, candidateCount:0, onboardDate:'', onboardTime:'', accountStatus:'', reviewer:'' });
+  const s = getStore(storeId);
+  const msg = `📢 新增待審申請\n供應商：${supplier}\n門市：${s.name}\n動作：${ACTION[action]}\n時間：${nowStr()}\n請至待審清單核准。`;
+  sendSeaTalkNotification(msg);
+  closeModal();
+  alert('已送出申請，營運將收到 SeaTalk 通知。');
+  toast('✅ 申請已送出，狀態：待審');
+  renderAll();
+}
+
+function submitReport(recId, action){
+  const r = recruitments.find(x=>x.id===recId);
+  const note = document.getElementById('m_note')?.value || '';
+  const candidateCount = parseInt(document.getElementById('m_count')?.value || '0') || 0;
+  const onboardDate = document.getElementById('m_date')?.value || '';
+  const onboardTime = document.getElementById('m_time')?.value || '';
+  if (action==='onboard' && !onboardDate){ alert('請選擇報到日期'); return; }
+  // 建立待審申請，並在 recruitment 標記 pendingAction
+  applications.push({ id: nextId('A'), time: nowStr(), supplier:r.supplier, storeId:r.storeId, action, status:'pending',
+    note, candidateCount, onboardDate: onboardDate ? onboardDate.replaceAll('-','/') : '', onboardTime, accountStatus: action==='confirm'?'已建立完成':'', reviewer:'' });
+  r.pendingAction = action;
+  const s = getStore(r.storeId);
+  sendSeaTalkNotification(`📢 新增待審申請\n供應商：${r.supplier}\n門市：${s.name}\n動作：${ACTION[action]}\n時間：${nowStr()}\n請至待審清單核准。`);
+  closeModal();
+  alert('已送出回報，營運將收到 SeaTalk 通知。');
+  toast('✅ 進度回報已送出，狀態：待審');
+  renderAll();
+}
+
+/* ============================================================================
+   區塊 16：營運 — 核准 / 拒絕
+   ============================================================================ */
+function approve(appId){
+  const a = applications.find(x=>x.id===appId); if(!a) return;
+  const store = getStore(a.storeId);
+  a.status = 'approved'; a.reviewer = 'Ops';
+  // 依動作更新公開狀態 / recruitment
+  if (a.action==='apply' || a.action==='start'){
+    // 取得招募資格 → 開始招募；建立 / 更新 recruitment
+    let r = findRec(a.supplier, a.storeId);
+    if (!r){ r = { id: nextId('R'), supplier:a.supplier, storeId:a.storeId, stage:'started', candidateCount:0, onboardDate:'', pendingAction:null, reserveUntil:null }; recruitments.push(r); }
+    r.stage = 'started';
+    r.reserveUntil = tsFromNow(PROGRESS.started.reserveHours); // 保留 7 天
+    r.pendingAction = null;
+    if (store.stage==='not_started' || store.stage==='started') store.stage = 'started';
+    if (store.status==='planning') store.status = 'open';
+  }
+  else if (a.action==='confirm'){
+    const r = findRec(a.supplier, a.storeId);
+    if (r){ r.stage='confirmed'; r.candidateCount=a.candidateCount; r.reserveUntil = tsFromNow(PROGRESS.confirmed.reserveHours); r.pendingAction=null; }
+    store.stage = 'confirmed';
+  }
+  else if (a.action==='onboard'){
+    const r = findRec(a.supplier, a.storeId);
+    if (r){ r.stage='onboard'; r.onboardDate=a.onboardDate; r.reserveUntil=null; r.pendingAction=null; }
+    store.stage = 'onboard'; // 暫時關閉新申請
+  }
+  else if (a.action==='waitlist'){
+    // 加入候補：建立 waitlist recruitment（不影響公開進度，只增加候補數）
+    recruitments.push({ id: nextId('R'), supplier:a.supplier, storeId:a.storeId, stage:'waitlist', candidateCount:0, onboardDate:'', pendingAction:null, reserveUntil:null });
+  }
+  logHistory(a.supplier, a.storeId, a.action, '核准', a.note);
+  sendSeaTalkNotification(`✅ 已核准\n供應商：${a.supplier}\n門市：${store.name}\n動作：${ACTION[a.action]}`);
+  toast(`✅ 已核准：${a.supplier} - ${ACTION[a.action]}`);
+  renderAll();
+}
+
+function reject(appId){
+  const a = applications.find(x=>x.id===appId); if(!a) return;
+  a.status='rejected'; a.reviewer='Ops';
+  // 若是回報類動作，解除 recruitment 的 pending 標記（維持原 stage）
+  const r = findRec(a.supplier, a.storeId);
+  if (r && r.pendingAction===a.action) r.pendingAction = null;
+  logHistory(a.supplier, a.storeId, a.action, '拒絕', a.note);
+  toast(`已拒絕：${a.supplier} - ${ACTION[a.action]}`);
+  renderAll();
+}
+
+/* ============================================================================
+   區塊 17：營運 — 招募完成 / 逾期釋出
+   ============================================================================ */
+function opsComplete(storeId){
+  if (!confirm('確認此門市招募完成？將標記為 ✅ 招募完成 / 已補齊，並停止所有新申請。')) return;
+  const store = getStore(storeId);
+  store.stage='completed'; store.status='filled';
+  // 找出主要供應商（非候補）
+  const r = recruitments.find(x=>x.storeId===storeId && x.stage!=='waitlist' && x.stage!=='completed');
+  if (r){ r.stage='completed'; r.reserveUntil=null; r.pendingAction=null; }
+  logHistory(r?r.supplier:'-', storeId, 'complete', '核准', '營運確認招募完成');
+  sendSeaTalkNotification(`🎉 招募完成\n門市：${store.name}\n狀態更新為 ✅ 已補齊`);
+  toast(`🎉 ${store.name} 招募完成`);
+  renderAll();
+}
+
+function opsRelease(recId){
+  const r = recruitments.find(x=>x.id===recId); if(!r) return;
+  if (!confirm('確認釋出此逾期名額？Dashboard 將回到 🟢 尚未開始（或由候補遞補）。')) return;
+  const store = getStore(r.storeId);
+  const releasedSupplier = r.supplier;
+  // 移除逾期的 recruitment
+  recruitments = recruitments.filter(x=>x.id!==r.id);
+  logHistory(releasedSupplier, r.storeId, 'release', '核准', '逾期未更新，名額釋出');
+  // 是否有候補可遞補
+  const waiter = recruitments.find(x=>x.storeId===r.storeId && x.stage==='waitlist');
+  if (waiter){
+    // 候補遞補：轉為 started，重新計算 7 天
+    waiter.stage='started'; waiter.reserveUntil=tsFromNow(PROGRESS.started.reserveHours);
+    store.stage='started';
+    logHistory(waiter.supplier, r.storeId, 'apply', '核准', '由候補遞補，開始招募');
+    sendSeaTalkNotification(`♻️ 名額釋出並由候補遞補\n門市：${store.name}\n遞補供應商：${waiter.supplier}`);
+    toast(`♻️ ${store.name} 名額釋出，候補 ${waiter.supplier} 遞補`);
+  } else {
+    store.stage = activeCount(store.id)>0 ? 'started' : 'not_started';
+    sendSeaTalkNotification(`♻️ 逾期名額已釋出\n門市：${store.name}\n回到 🟢 尚未開始`);
+    toast(`♻️ ${store.name} 逾期名額已釋出`);
+  }
+  renderAll();
+}
+
+/* ============================================================================
+   區塊 18：身份切換
+   ============================================================================ */
+// 登入：驗證帳密 → 設定身份 → 進入系統
+// TODO: 串接 — 改為呼叫 Apps Script 驗證帳密，成功後回傳角色與供應商名稱。
+function doLogin(){
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const acc = ACCOUNTS.find(a => a.username===u && a.password===p);
+  if (!acc){ document.getElementById('loginErr').textContent = '帳號或密碼錯誤，請重新輸入。'; return; }
+  currentUser = acc;
+  currentRole = acc.role==='ops' ? 'ops' : acc.supplier; // 身份由登入決定，不可自選
+  document.getElementById('loginErr').textContent = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('userInfo').textContent = acc.displayName + (acc.role==='ops' ? '' : '（供應商）');
+  document.getElementById('loginMask').classList.add('hide');
+  gotoPage('dashboard');
+}
+// 登出：清除身份，回到登入畫面
+function logout(){
+  currentUser = null; currentRole = null;
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginErr').textContent = '';
+  document.getElementById('loginMask').classList.remove('hide');
+}
+// 登入畫面：Enter 鍵送出 + Demo 帳號提示
+document.getElementById('loginPass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('loginUser').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+document.getElementById('loginHint').innerHTML =
+  '<b>Demo 測試帳號</b><br>供應商：hongyun / suda / pxlogi / taiwan / youxuan（密碼皆 1234）<br>營運：ops（密碼 admin）';
+
+/* ============================================================================
+   區塊 19：總渲染
+   ============================================================================ */
+function renderAll(){
+  document.getElementById('whoLabel').textContent = isOps() ? '營運人員 (Ops)' : currentRole + '（供應商）';
+  const pend = applications.filter(a=>a.status==='pending').length;
+  document.getElementById('navReviewBadge').textContent = pend;
+  renderKPI();
+  buildFilters('filters-dashboard');
+  buildFilters('filters-stores');
+  renderStoreTable('dashTable');
+  renderStoreTable('storesTable');
+  renderMine();
+  renderReviewTabs();
+  renderReview();
+  renderHistory();
+}
+
+/* ============================================================================
+   區塊 20：初始化
+   ============================================================================ */
+renderRules();
+// 預設顯示登入畫面；登入成功後 doLogin() 才會進入系統並 renderAll()。
+
+// 每分鐘重新計算倒數（逾期判斷）；未登入時 loginMask 仍蓋住，不影響。
+setInterval(()=>{ if(currentRole) renderAll(); }, 60*1000);
+
+console.log('%c供應商門市招募平台 已載入','color:#ee4d2d;font-weight:bold');
+console.log('Demo 帳號 → 供應商：hongyun/suda/pxlogi/taiwan/youxuan（密碼 1234）；營運：ops（密碼 admin）。SeaTalk 通知會印在此 Console。');
 </script>
 </body>
 </html>
